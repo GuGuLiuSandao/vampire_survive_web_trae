@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>吸血鬼幸存者</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="game-container">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <div id="ui-container">
+            <div class="ui-panel">
+                <div class="health-bar">
+                    <div class="health-label">生命值: <span id="health-value">100</span></div>
+                    <div class="health-fill" id="health-fill"></div>
+                </div>
+                <div class="exp-bar">
+                    <div class="exp-label">经验值: <span id="exp-value">0</span> / <span id="exp-required">100</span></div>
+                    <div class="exp-fill" id="exp-fill"></div>
+                </div>
+                <div class="level-info">等级: <span id="level-value">1</span></div>
+                <div class="score-info">得分: <span id="score-value">0</span></div>
+                <div class="fps-info">FPS: <span id="fps-value">0</span></div>
+            </div>
+            <div id="level-up-panel" class="level-up-panel hidden">
+                <h2>升级!</h2>
+                <div class="level-up-options">
+                    <div class="option" data-option="0">
+                        <h3>飞刀</h3>
+                        <p>投掷锋利的飞刀攻击敌人</p>
+                    </div>
+                    <div class="option" data-option="1">
+                        <h3>魔法球</h3>
+                        <p>发射魔法球，击中敌人后爆炸</p>
+                    </div>
+                    <div class="option" data-option="2">
+                        <h3>环刃</h3>
+                        <p>旋转的环刃攻击周围的敌人</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="game-over-panel" class="game-over-panel hidden">
+            <h1>游戏结束</h1>
+            <div class="final-score">最终得分: <span id="final-score">0</span></div>
+            <div class="survival-time">生存时间: <span id="survival-time">0</span></div>
+            <button id="restart-btn">重新开始</button>
+        </div>
+        <div id="start-menu" class="start-menu">
+            <h1 class="game-title">吸血鬼幸存者</h1>
+            <div class="menu-content">
+                <div class="difficulty-selection">
+                    <h2>选择难度</h2>
+                    <div class="difficulty-buttons">
+                        <button class="difficulty-btn active" data-difficulty="easy">简单</button>
+                        <button class="difficulty-btn" data-difficulty="normal">普通</button>
+                        <button class="difficulty-btn" data-difficulty="hard">困难</button>
+                    </div>
+                </div>
+                <div class="start-button-container">
+                    <button id="start-game-btn" class="start-btn">开始游戏</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>

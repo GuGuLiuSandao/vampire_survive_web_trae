@@ -1,0 +1,346 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Arial', sans-serif;
+    background-color: #000;
+    color: #fff;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+.game-container {
+    position: relative;
+    width: 800px;
+    height: 600px;
+    border: 2px solid #333;
+    border-radius: 5px;
+    overflow: hidden;
+    background-color: #1a1a1a;
+}
+
+#gameCanvas {
+    display: block;
+    background-color: #2a2a2a;
+}
+
+#ui-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.ui-panel {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background-color: rgba(0, 0, 0, 0.7);
+    padding: 10px;
+    border-radius: 5px;
+    min-width: 200px;
+}
+
+.health-bar, .exp-bar {
+    margin-bottom: 10px;
+}
+
+.health-label, .exp-label, .level-info, .score-info, .fps-info {
+    font-size: 14px;
+    margin-bottom: 5px;
+    color: #fff;
+}
+
+.health-fill, .exp-fill {
+    height: 10px;
+    border-radius: 5px;
+    transition: width 0.3s ease;
+}
+
+.health-fill {
+    background-color: #ff4444;
+    width: 100%;
+}
+
+.exp-fill {
+    background-color: #4444ff;
+    width: 0%;
+}
+
+.level-info, .score-info, .fps-info {
+    margin-top: 5px;
+    font-weight: bold;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.level-up-panel {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(0, 0, 0, 0.9);
+    padding: 20px;
+    border-radius: 10px;
+    text-align: center;
+    width: 500px;
+    pointer-events: auto;
+    border: 2px solid #ffcc00;
+}
+
+.level-up-panel h2 {
+    color: #ffcc00;
+    margin-bottom: 20px;
+    font-size: 24px;
+}
+
+.level-up-options {
+    display: flex;
+    justify-content: space-around;
+    gap: 15px;
+}
+
+.option {
+    background-color: rgba(255, 255, 255, 0.1);
+    padding: 15px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex: 1;
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+}
+
+.option::before {
+    content: attr(data-option);
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background-color: rgba(255, 204, 0, 0.8);
+    color: #000;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+.option:hover {
+    background-color: rgba(255, 204, 0, 0.2);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(255, 204, 0, 0.3);
+}
+
+.option h3 {
+    color: #ffcc00;
+    margin-bottom: 10px;
+    font-size: 18px;
+}
+
+.option p {
+    color: #ccc;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.game-over-panel {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(0, 0, 0, 0.95);
+    padding: 30px;
+    border-radius: 10px;
+    text-align: center;
+    width: 400px;
+    pointer-events: auto;
+    border: 2px solid #ff4444;
+}
+
+.game-over-panel h1 {
+    color: #ff4444;
+    margin-bottom: 20px;
+    font-size: 32px;
+}
+
+.final-score, .survival-time {
+    font-size: 20px;
+    margin: 15px 0;
+    color: #fff;
+}
+
+#restart-btn {
+    background-color: #4444ff;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    font-size: 18px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 20px;
+    transition: all 0.2s ease;
+}
+
+#restart-btn:hover {
+    background-color: #3333cc;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(68, 68, 255, 0.3);
+}
+
+#restart-btn:active {
+    transform: translateY(0);
+}
+
+/* 开始菜单样式 */
+.start-menu {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.95);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: #fff;
+    z-index: 1000;
+}
+
+.game-title {
+    font-size: 48px;
+    color: #ffcc00;
+    margin-bottom: 40px;
+    text-shadow: 0 0 10px rgba(255, 204, 0, 0.5);
+}
+
+.menu-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 30px;
+}
+
+.difficulty-selection {
+    text-align: center;
+}
+
+.difficulty-selection h2 {
+    font-size: 24px;
+    margin-bottom: 20px;
+    color: #ffcc00;
+}
+
+.difficulty-buttons {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+}
+
+.difficulty-btn {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    border: 2px solid #ffcc00;
+    padding: 12px 24px;
+    font-size: 18px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 100px;
+}
+
+.difficulty-btn:hover {
+    background-color: rgba(255, 204, 0, 0.2);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(255, 204, 0, 0.3);
+}
+
+.difficulty-btn.active {
+    background-color: rgba(255, 204, 0, 0.4);
+    border-color: #fff;
+    box-shadow: 0 4px 8px rgba(255, 204, 0, 0.3);
+}
+
+.start-button-container {
+    margin-top: 20px;
+}
+
+.start-btn {
+    background-color: #4444ff;
+    color: white;
+    border: none;
+    padding: 15px 30px;
+    font-size: 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 150px;
+}
+
+.start-btn:hover {
+    background-color: #3333cc;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(68, 68, 255, 0.3);
+}
+
+.start-btn:active {
+    transform: translateY(0);
+}
+
+/* 响应式设计 */
+@media (max-width: 850px) {
+    .game-container {
+        width: 100vw;
+        height: 100vh;
+        border: none;
+    }
+    
+    #gameCanvas {
+        width: 100%;
+        height: 100%;
+    }
+    
+    .level-up-panel {
+        width: 90%;
+        max-width: 500px;
+    }
+    
+    .level-up-options {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .option {
+        min-height: auto;
+    }
+    
+    .game-title {
+        font-size: 36px;
+    }
+    
+    .difficulty-buttons {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .start-btn {
+        padding: 12px 24px;
+        font-size: 18px;
+    }
+}
