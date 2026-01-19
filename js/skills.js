@@ -1073,40 +1073,76 @@ export function getSkillsByRarity(rarity) {
 export function getRandomSkillOptions(count = 3, playerLevel = 1, playerClass = 'druid', player = null) {
     // 获取所有技能，并过滤出玩家等级达到要求且与玩家职业匹配的技能
     const allSkills = getAllSkills();
-    let availableSkills = allSkills.filter(skill => 
-        skill.levelRequirement <= playerLevel && 
-        skill.class === playerClass
-    );
     
-    // 15级时，必须包含艾露恩之怒
+    // 过滤可用技能：等级要求、职业匹配，并且考虑玩家已有的技能是否满级
+    let availableSkills = allSkills.filter(skill => {
+        // 基础过滤条件
+        const basicRequirements = skill.levelRequirement <= playerLevel && skill.class === playerClass;
+        
+        // 如果没有玩家对象或玩家没有技能数组，直接返回基础条件
+        if (!player || !player.skills) {
+            return basicRequirements;
+        }
+        
+        // 检查玩家是否已经拥有该技能
+        const playerSkill = player.skills.find(playerSkill => playerSkill.id === skill.id);
+        
+        // 如果玩家没有该技能，或者该技能还没有满级，则可用
+        return basicRequirements && (!playerSkill || playerSkill.level < playerSkill.maxLevel);
+    });
+    
+    // 15级时，必须包含艾露恩之怒（如果玩家还没有获得或者还没满级）
     if (playerLevel === 15) {
-        // 15级时，必须包含艾露恩之怒
         const elunesWrathSkill = createSkill('elunesWrath');
         if (elunesWrathSkill) {
-            // 确保可用技能中包含艾露恩之怒
-            if (!availableSkills.some(skill => skill.id === 'elunesWrath')) {
-                availableSkills.push(elunesWrathSkill);
+            // 检查玩家是否已经拥有艾露恩之怒且已满级
+            const playerHasElunesWrath = player && player.skills && player.skills.some(skill => 
+                skill.id === 'elunesWrath' && skill.level >= skill.maxLevel
+            );
+            
+            // 只有当玩家没有获得或没满级时，才需要确保包含艾露恩之怒
+            if (!playerHasElunesWrath) {
+                // 确保可用技能中包含艾露恩之怒
+                if (!availableSkills.some(skill => skill.id === 'elunesWrath')) {
+                    availableSkills.push(elunesWrathSkill);
+                }
+                
+                // 如果可用技能少于请求数量，返回所有可用技能
+                if (availableSkills.length <= count) {
+                    return availableSkills;
+                }
+                
+                // 确保返回的选项中包含艾露恩之怒
+                const filteredSkills = availableSkills.filter(skill => skill.id !== 'elunesWrath');
+                const shuffled = [...filteredSkills].sort(() => Math.random() - 0.5);
+                const result = [elunesWrathSkill]; // 先添加艾露恩之怒
+                
+                // 再添加其他随机技能，直到达到指定数量
+                for (let i = 0; i < count - 1 && i < filteredSkills.length; i++) {
+                    result.push(shuffled[i]);
+                }
+                
+                return result;
             }
         }
-        
-        // 如果可用技能少于请求数量，返回所有可用技能
-        if (availableSkills.length <= count) {
-            return availableSkills;
-        }
-        
-        // 确保返回的选项中包含艾露恩之怒
-        const filteredSkills = availableSkills.filter(skill => skill.id !== 'elunesWrath');
-        const shuffled = [...filteredSkills].sort(() => Math.random() - 0.5);
-        const result = [elunesWrathSkill]; // 先添加艾露恩之怒
-        
-        // 再添加其他随机技能，直到达到指定数量
-        for (let i = 0; i < count - 1 && i < filteredSkills.length; i++) {
-            result.push(shuffled[i]);
-        }
-        
-        return result;
     } else if (playerLevel === 20 || playerLevel === 25 || playerLevel === 30) {
-        // 20、25、30级时，只能选择艾露恩之怒的强化选项
+        // 20、25、30级时，检查玩家是否已经拥有艾露恩之怒且已满级
+        const playerHasElunesWrath = player && player.skills && player.skills.some(skill => 
+            skill.id === 'elunesWrath' && skill.level >= skill.maxLevel
+        );
+        
+        // 如果玩家已经拥有艾露恩之怒且已满级，则不返回该技能
+        if (playerHasElunesWrath) {
+            // 从可用技能中选择其他技能
+            const filteredSkills = availableSkills.filter(skill => skill.id !== 'elunesWrath');
+            if (filteredSkills.length <= count) {
+                return filteredSkills;
+            }
+            const shuffled = [...filteredSkills].sort(() => Math.random() - 0.5);
+            return shuffled.slice(0, count);
+        }
+        
+        // 否则返回艾露恩之怒
         return [createSkill('elunesWrath')];
     }
     
