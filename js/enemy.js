@@ -4,15 +4,20 @@ import { distance, angleBetween, randomInt, randomFloat } from './utils.js';
 
 class Enemy {
     constructor(x, y, type = 'basic') {
-        // 位置和尺寸
+        // 位置和尺寸 - 将敌人放大到原来的两倍（14*2=28）
         this.x = x;
         this.y = y;
-        this.width = 16;
-        this.height = 16;
+        this.width = 28; // 放大敌人尺寸到原来的两倍
+        this.height = 28;
+        
+        // 固定碰撞体积，与图片大小无关
+        this.collisionSize = 12; // 碰撞尺寸也放大到原来的两倍
         
         // 移动相关
-        this.speed = 50;
+        this.speed = 25; // 大幅降低移动速度
         this.direction = { x: 0, y: 0 };
+        this.isMoving = false;
+        this.facing = 'right'; // 面向方向：left 或 right
         
         // 状态
         this.health = 10;
@@ -29,6 +34,29 @@ class Enemy {
         this.rotation = 0;
         this.shape = 'square'; // 形状：square, circle, triangle
         
+        // 图像资源 - 区分左右方向的图片
+        this.images = {
+            stand: {
+                left: new Image(),
+                right: new Image()
+            },
+            walk: {
+                left: new Image(),
+                right: new Image()
+            }
+        };
+        
+        // 加载不同类型敌人的图像资源
+        this.loadEnemyImages();
+        
+        // 当前使用的图像
+        this.currentImage = this.images.stand.right;
+        
+        // 动画相关
+        this.animationFrame = 0;
+        this.animationSpeed = 0.02; // 低频率切换
+        this.isWalkingFrame = false;
+        
         // 远程攻击相关
         this.isRanged = false;
         this.attackRange = 0;
@@ -40,58 +68,95 @@ class Enemy {
         this.initType();
     }
     
+    // 根据敌人类型加载图像资源
+    loadEnemyImages() {
+        // 根据敌人类型选择不同的图像集
+        switch(this.type) {
+            case 'basic':
+            case 'fast':
+            case 'ranged':
+            case 'flying':
+                // 使用恶狗敌人图像
+                this.images.stand.left.src = './resources/enemy_evil_dog_left.jpg';
+                this.images.stand.right.src = './resources/enemy_evil_dog_stand_right.jpg';
+                this.images.walk.left.src = './resources/enemy_evil_dog_walk_left.png';
+                this.images.walk.right.src = './resources/enemy_evil_dog_walk_right.jpg';
+                break;
+                
+            case 'tank':
+            case 'strong':
+                // 使用坦克敌人图像
+                this.images.stand.left.src = './resources/enemy_tank_interno_stand_left.jpg';
+                this.images.stand.right.src = './resources/enemy_tank_interno_stand_right.jpg';
+                this.images.walk.left.src = './resources/enemy_tank_interno_walk_left.jpg';
+                this.images.walk.right.src = './resources/enemy_tank_interno_walk_right.jpg';
+                break;
+                
+            default:
+                // 默认使用恶狗敌人图像
+                this.images.stand.left.src = './resources/enemy_evil_dog_left.jpg';
+                this.images.stand.right.src = './resources/enemy_evil_dog_stand_right.jpg';
+                this.images.walk.left.src = './resources/enemy_evil_dog_walk_left.png';
+                this.images.walk.right.src = './resources/enemy_evil_dog_walk_right.jpg';
+                break;
+        }
+    }
+    
     initType() {
         // 根据敌人类型设置不同属性
+        // 注意：视觉尺寸（width, height）用于渲染图片，保持较大值
+        // 碰撞尺寸（collisionSize）用于物理碰撞，保持较小值
         switch(this.type) {
             case 'basic':
                 this.health = 15;
                 this.maxHealth = 15;
-                this.speed = 60;
+                this.speed = 30; // 降低基础敌人速度
                 this.damage = 8;
                 this.expReward = 10;
                 this.scoreReward = 10;
                 this.color = '#ff0000';
-                this.width = 16;
-                this.height = 16;
+                // 视觉尺寸保持不变（72x72），用于渲染图片
+                // 碰撞尺寸设置为较小值，用于物理碰撞
+                this.collisionSize = 10;
                 this.shape = 'square';
                 break;
             
             case 'fast':
                 this.health = 8;
                 this.maxHealth = 8;
-                this.speed = 120;
+                this.speed = 60; // 降低快速敌人速度
                 this.damage = 5;
                 this.expReward = 15;
                 this.scoreReward = 15;
                 this.color = '#ffff00';
-                this.width = 12;
-                this.height = 12;
+                // 视觉尺寸保持不变（72x72），用于渲染图片
+                this.collisionSize = 8;
                 this.shape = 'circle';
                 break;
             
             case 'strong':
                 this.health = 35;
                 this.maxHealth = 35;
-                this.speed = 40;
+                this.speed = 20; // 降低强壮敌人速度
                 this.damage = 15;
                 this.expReward = 30;
                 this.scoreReward = 30;
                 this.color = '#ff6600';
-                this.width = 24;
-                this.height = 24;
+                // 视觉尺寸保持不变（72x72），用于渲染图片
+                this.collisionSize = 14;
                 this.shape = 'square';
                 break;
             
             case 'ranged':
                 this.health = 12;
                 this.maxHealth = 12;
-                this.speed = 50;
+                this.speed = 25; // 降低远程敌人速度
                 this.damage = 6;
                 this.expReward = 20;
                 this.scoreReward = 20;
                 this.color = '#00ffff';
-                this.width = 18;
-                this.height = 18;
+                // 视觉尺寸保持不变（72x72），用于渲染图片
+                this.collisionSize = 10;
                 this.shape = 'triangle';
                 this.isRanged = true;
                 this.attackRange = 250;
@@ -102,26 +167,26 @@ class Enemy {
             case 'flying':
                 this.health = 10;
                 this.maxHealth = 10;
-                this.speed = 90;
+                this.speed = 45; // 降低飞行敌人速度
                 this.damage = 6;
                 this.expReward = 18;
                 this.scoreReward = 18;
                 this.color = '#ff00ff';
-                this.width = 14;
-                this.height = 14;
+                // 视觉尺寸保持不变（72x72），用于渲染图片
+                this.collisionSize = 8;
                 this.shape = 'circle';
                 break;
             
             case 'tank':
                 this.health = 55;
                 this.maxHealth = 55;
-                this.speed = 25;
+                this.speed = 12; // 降低坦克敌人速度
                 this.damage = 20;
                 this.expReward = 40;
                 this.scoreReward = 40;
                 this.color = '#884400';
-                this.width = 30;
-                this.height = 30;
+                // 视觉尺寸保持不变（72x72），用于渲染图片
+                this.collisionSize = 18;
                 this.shape = 'square';
                 break;
         }
@@ -153,12 +218,23 @@ class Enemy {
     }
     
     updateDirection(player) {
-        // 计算朝向玩家的角度
-        const angle = angleBetween(this.x, this.y, player.x, player.y);
+        // 计算朝向玩家的角度 - 使用中心点计算
+        const enemyCenterX = this.x + this.width / 2;
+        const enemyCenterY = this.y + this.height / 2;
+        const playerCenterX = player.x + player.width / 2;
+        const playerCenterY = player.y + player.height / 2;
+        const angle = angleBetween(enemyCenterX, enemyCenterY, playerCenterX, playerCenterY);
         
         // 设置方向向量
         this.direction.x = Math.cos(angle);
         this.direction.y = Math.sin(angle);
+        
+        // 设置面向方向
+        if (this.direction.x < 0) {
+            this.facing = 'left';
+        } else if (this.direction.x > 0) {
+            this.facing = 'right';
+        }
     }
     
     move(deltaTime) {
@@ -169,17 +245,47 @@ class Enemy {
         // 更新位置
         this.x += moveX;
         this.y += moveY;
+        
+        // 更新移动状态
+        this.isMoving = Math.abs(moveX) > 0 || Math.abs(moveY) > 0;
+        
+        // 更新动画
+        if (this.isMoving) {
+            // 更新动画帧 - 低频率切换
+            this.animationFrame += this.animationSpeed;
+            if (this.animationFrame >= 1) {
+                this.animationFrame = 0;
+                // 切换行走/站立图像
+                this.isWalkingFrame = !this.isWalkingFrame;
+            }
+            
+            // 根据当前帧状态选择图像
+            if (this.isWalkingFrame) {
+                this.currentImage = this.images.walk[this.facing];
+            } else {
+                this.currentImage = this.images.stand[this.facing];
+            }
+        } else {
+            // 站立状态，使用站立图像
+            this.currentImage = this.images.stand[this.facing];
+            this.animationFrame = 0;
+            this.isWalkingFrame = false;
+        }
     }
     
     // 远程敌人攻击方法
     attack(player, projectiles) {
-        // 计算朝向玩家的角度
-        const angle = angleBetween(this.x, this.y, player.x, player.y);
+        // 计算朝向玩家的角度 - 使用中心点计算
+        const enemyCenterX = this.x + this.width / 2;
+        const enemyCenterY = this.y + this.height / 2;
+        const playerCenterX = player.x + player.width / 2;
+        const playerCenterY = player.y + player.height / 2;
+        const angle = angleBetween(enemyCenterX, enemyCenterY, playerCenterX, playerCenterY);
         
         // 创建投射物
         const projectile = {
-            x: this.x + this.width / 2,
-            y: this.y + this.height / 2,
+            x: enemyCenterX,
+            y: enemyCenterY,
             angle: angle,
             speed: this.projectileSpeed,
             damage: this.damage,
@@ -187,7 +293,9 @@ class Enemy {
             color: this.color,
             width: 6,
             height: 6,
-            type: 'enemy'
+            type: 'enemy',
+            // 固定碰撞体积
+            collisionSize: 4
         };
         
         projectiles.push(projectile);
@@ -197,32 +305,14 @@ class Enemy {
         // 保存当前上下文状态
         ctx.save();
         
-        // 绘制敌人
-        ctx.fillStyle = this.color;
-        
-        // 根据形状绘制敌人
-        const centerX = this.x + this.width / 2;
-        const centerY = this.y + this.height / 2;
-        
-        switch(this.shape) {
-            case 'square':
-                ctx.fillRect(this.x, this.y, this.width, this.height);
-                break;
-                
-            case 'circle':
-                ctx.beginPath();
-                ctx.arc(centerX, centerY, this.width / 2, 0, Math.PI * 2);
-                ctx.fill();
-                break;
-                
-            case 'triangle':
-                ctx.beginPath();
-                ctx.moveTo(centerX, this.y);
-                ctx.lineTo(this.x, this.y + this.height);
-                ctx.lineTo(this.x + this.width, this.y + this.height);
-                ctx.closePath();
-                ctx.fill();
-                break;
+        // 确保图像加载完成后再渲染
+        if (this.currentImage && this.currentImage.complete) {
+            // 直接绘制敌人精灵，使用当前面向方向和动画状态
+            ctx.drawImage(this.currentImage, this.x, this.y, this.width, this.height);
+        } else {
+            // 图像未加载完成时，绘制一个临时矩形作为占位符
+            ctx.fillStyle = this.color;
+            ctx.fillRect(this.x, this.y, this.width, this.height);
         }
         
         // 绘制敌人生命值条

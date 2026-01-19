@@ -3,41 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>吸血鬼幸存者</title>
+    <title>魔兽生存</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="game-container">
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         <div id="ui-container">
-            <div class="ui-panel">
-                <div class="health-bar">
+            <!-- 顶部横条 - 血量和经验 -->
+            <div class="top-bar">
+                <div class="health-bar-large">
                     <div class="health-label">生命值: <span id="health-value">100</span></div>
                     <div class="health-fill" id="health-fill"></div>
                 </div>
-                <div class="exp-bar">
+                <div class="exp-bar-large">
                     <div class="exp-label">经验值: <span id="exp-value">0</span> / <span id="exp-required">100</span></div>
                     <div class="exp-fill" id="exp-fill"></div>
                 </div>
+            </div>
+            
+            <!-- 底部左侧信息面板 -->
+            <div class="bottom-left-panel">
                 <div class="level-info">等级: <span id="level-value">1</span></div>
                 <div class="score-info">得分: <span id="score-value">0</span></div>
                 <div class="fps-info">FPS: <span id="fps-value">0</span></div>
+                <div class="skills-panel">
+                    <!-- 技能等级信息将通过JavaScript动态添加 -->
+                </div>
+            </div>
+            
+            <!-- 传说技能按钮 -->
+            <div id="legendary-skill-btn" class="legendary-skill-btn hidden">
+                <div class="skill-icon">
+                    <div class="skill-name">艾露恩之怒</div>
+                    <div class="skill-cooldown" id="skill-cooldown">60s</div>
+                </div>
+                <div class="skill-cooldown-overlay" id="skill-cooldown-overlay"></div>
             </div>
             <div id="level-up-panel" class="level-up-panel hidden">
                 <h2>升级!</h2>
                 <div class="level-up-options">
-                    <div class="option" data-option="0">
-                        <h3>飞刀</h3>
-                        <p>投掷锋利的飞刀攻击敌人</p>
-                    </div>
-                    <div class="option" data-option="1">
-                        <h3>魔法球</h3>
-                        <p>发射魔法球，击中敌人后爆炸</p>
-                    </div>
-                    <div class="option" data-option="2">
-                        <h3>环刃</h3>
-                        <p>旋转的环刃攻击周围的敌人</p>
-                    </div>
+                    <!-- 技能选项将通过JavaScript动态生成 -->
                 </div>
             </div>
         </div>
@@ -48,8 +54,18 @@
             <button id="restart-btn">重新开始</button>
         </div>
         <div id="start-menu" class="start-menu">
-            <h1 class="game-title">吸血鬼幸存者</h1>
+            <h1 class="game-title">魔兽生存</h1>
             <div class="menu-content">
+                <div class="class-selection">
+                    <h2>选择职业</h2>
+                    <div class="class-buttons">
+                        <button class="class-btn active" data-class="druid">德鲁伊</button>
+                        <!-- 其他职业将在后续版本中添加 -->
+                        <!-- <button class="class-btn" data-class="warrior">战士</button>
+                        <button class="class-btn" data-class="mage">法师</button>
+                        <button class="class-btn" data-class="hunter">猎人</button> -->
+                    </div>
+                </div>
                 <div class="difficulty-selection">
                     <h2>选择难度</h2>
                     <div class="difficulty-buttons">

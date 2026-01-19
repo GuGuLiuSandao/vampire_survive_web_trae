@@ -22,12 +22,12 @@ body {
     border: 2px solid #333;
     border-radius: 5px;
     overflow: hidden;
-    background-color: #1a1a1a;
+    background-color: #ffffff;
 }
 
 #gameCanvas {
     display: block;
-    background-color: #2a2a2a;
+    background-color: #ffffff;
 }
 
 #ui-container {
@@ -39,35 +39,40 @@ body {
     pointer-events: none;
 }
 
-.ui-panel {
+/* 顶部横条样式 */
+.top-bar {
     position: absolute;
-    top: 10px;
-    left: 10px;
+    top: 0;
+    left: 0;
+    width: 100%;
     background-color: rgba(0, 0, 0, 0.7);
-    padding: 10px;
-    border-radius: 5px;
-    min-width: 200px;
+    padding: 10px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 100;
 }
 
-.health-bar, .exp-bar {
-    margin-bottom: 10px;
+.health-bar-large, .exp-bar-large {
+    width: 100%;
 }
 
-.health-label, .exp-label, .level-info, .score-info, .fps-info {
+.health-label, .exp-label {
     font-size: 14px;
     margin-bottom: 5px;
     color: #fff;
+    font-weight: bold;
 }
 
 .health-fill, .exp-fill {
-    height: 10px;
-    border-radius: 5px;
+    height: 15px;
+    border-radius: 8px;
     transition: width 0.3s ease;
+    width: 100%;
 }
 
 .health-fill {
     background-color: #ff4444;
-    width: 100%;
 }
 
 .exp-fill {
@@ -75,9 +80,36 @@ body {
     width: 0%;
 }
 
+/* 底部左侧面板样式 */
+.bottom-left-panel {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    background-color: rgba(0, 0, 0, 0.7);
+    padding: 10px;
+    border-radius: 5px;
+    min-width: 200px;
+    z-index: 100;
+}
+
 .level-info, .score-info, .fps-info {
-    margin-top: 5px;
+    font-size: 14px;
+    margin-bottom: 5px;
+    color: #fff;
     font-weight: bold;
+}
+
+/* 技能面板样式 */
+.skills-panel {
+    margin-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.3);
+    padding-top: 10px;
+}
+
+.skill-level-item {
+    font-size: 12px;
+    margin-bottom: 3px;
+    color: #ccc;
 }
 
 .hidden {
@@ -237,23 +269,88 @@ body {
     gap: 30px;
 }
 
-.difficulty-selection {
+.difficulty-selection,
+.class-selection {
     text-align: center;
 }
 
-.difficulty-selection h2 {
+.difficulty-selection h2,
+.class-selection h2 {
     font-size: 24px;
     margin-bottom: 20px;
     color: #ffcc00;
 }
 
-.difficulty-buttons {
+/* 传说技能按钮 */
+.legendary-skill-btn {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    width: 80px;
+    height: 80px;
+    background-color: rgba(0, 0, 0, 0.6);
+    border: 3px solid #ff8000;
+    border-radius: 10px;
+    cursor: pointer;
+    overflow: hidden;
+    z-index: 500;
+    transition: all 0.3s ease;
+}
+
+.legendary-skill-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 20px rgba(255, 128, 0, 0.8);
+}
+
+.legendary-skill-btn.hidden {
+    display: none;
+}
+
+.skill-icon {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px black;
+    position: relative;
+    z-index: 2;
+}
+
+.skill-name {
+    font-size: 14px;
+    margin-bottom: 5px;
+    text-align: center;
+}
+
+.skill-cooldown {
+    font-size: 16px;
+    color: #ff8000;
+}
+
+.skill-cooldown-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 0;
+    background-color: rgba(0, 0, 0, 0.8);
+    transition: height 0.1s linear;
+    z-index: 1;
+}
+
+.difficulty-buttons,
+.class-buttons {
     display: flex;
     gap: 15px;
     justify-content: center;
 }
 
-.difficulty-btn {
+.difficulty-btn,
+.class-btn {
     background-color: rgba(255, 255, 255, 0.1);
     color: #fff;
     border: 2px solid #ffcc00;
@@ -265,16 +362,25 @@ body {
     min-width: 100px;
 }
 
-.difficulty-btn:hover {
+.difficulty-btn:hover,
+.class-btn:hover {
     background-color: rgba(255, 204, 0, 0.2);
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(255, 204, 0, 0.3);
 }
 
-.difficulty-btn.active {
+.difficulty-btn.active,
+.class-btn.active {
     background-color: rgba(255, 204, 0, 0.4);
     border-color: #fff;
     box-shadow: 0 4px 8px rgba(255, 204, 0, 0.3);
+}
+
+/* 技能稀有度样式 */
+.skill-rarity {
+    font-size: 12px;
+    margin-top: 5px;
+    font-style: italic;
 }
 
 .start-button-container {

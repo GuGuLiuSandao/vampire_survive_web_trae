@@ -14,11 +14,19 @@ class UI {
         this.scoreValue = document.getElementById('score-value');
         this.fpsValue = document.getElementById('fps-value');
         
+        // 技能面板元素
+        this.skillsPanel = document.querySelector('.skills-panel');
+        
         // 面板元素
         this.levelUpPanel = document.getElementById('level-up-panel');
         this.gameOverPanel = document.getElementById('game-over-panel');
         this.finalScore = document.getElementById('final-score');
         this.survivalTime = document.getElementById('survival-time');
+        
+        // 艾露恩之怒技能按钮和倒计时元素
+        this.legendarySkillBtn = document.getElementById('legendary-skill-btn');
+        this.skillCooldown = document.getElementById('skill-cooldown');
+        this.skillCooldownOverlay = document.getElementById('skill-cooldown-overlay');
     }
     
     update(gameState) {
@@ -36,6 +44,61 @@ class UI {
         
         // 更新FPS显示
         this.fpsValue.textContent = gameState.fps;
+        
+        // 更新技能等级显示
+        if (gameState.skills) {
+            this.updateSkillsPanel(gameState.skills);
+        }
+        
+        // 更新艾露恩之怒技能按钮和倒计时显示
+        if (gameState.skills) {
+            const elunesWrathSkill = gameState.skills.find(skill => skill.id === 'elunesWrath');
+            if (elunesWrathSkill) {
+                // 显示技能按钮
+                this.legendarySkillBtn.classList.remove('hidden');
+                
+                // 更新倒计时显示
+                const cooldownSeconds = elunesWrathSkill.getCurrentCooldownSeconds();
+                this.skillCooldown.textContent = cooldownSeconds > 0 ? `${cooldownSeconds}s` : '就绪';
+                
+                // 更新冷却覆盖层
+                const cooldownPercentage = elunesWrathSkill.getCooldownPercentage();
+                this.skillCooldownOverlay.style.height = `${cooldownPercentage * 100}%`;
+            } else {
+                // 隐藏技能按钮
+                this.legendarySkillBtn.classList.add('hidden');
+            }
+        } else {
+            // 隐藏技能按钮
+            this.legendarySkillBtn.classList.add('hidden');
+        }
+    }
+    
+    // 更新技能面板显示
+    updateSkillsPanel(skills) {
+        if (!this.skillsPanel) return;
+        
+        // 清空现有技能信息
+        this.skillsPanel.innerHTML = '';
+        
+        // 只显示已学习的技能
+        const learnedSkills = skills.filter(skill => skill !== null && skill !== undefined);
+        
+        if (learnedSkills.length === 0) {
+            const noSkillsElement = document.createElement('div');
+            noSkillsElement.className = 'skill-level-item';
+            noSkillsElement.textContent = '暂无学习的技能';
+            this.skillsPanel.appendChild(noSkillsElement);
+            return;
+        }
+        
+        // 添加技能等级信息
+        learnedSkills.forEach(skill => {
+            const skillElement = document.createElement('div');
+            skillElement.className = 'skill-level-item';
+            skillElement.textContent = `${skill.name}: 等级 ${skill.level}`;
+            this.skillsPanel.appendChild(skillElement);
+        });
     }
     
     updateHealthBar(current, max) {

@@ -3,8 +3,9 @@
 // 确保DOM加载完成后再初始化游戏
 document.addEventListener('DOMContentLoaded', () => {
     // 导入游戏核心逻辑
-    import('./game.js').then(({ game }) => {
-        // 游戏已经在game.js中初始化
+    import('./game.js').then(({ Game }) => {
+        // 在DOM加载完成后创建游戏实例
+        const game = new Game();
         console.log('游戏初始化完成');
     }).catch(error => {
         console.error('游戏初始化失败:', error);

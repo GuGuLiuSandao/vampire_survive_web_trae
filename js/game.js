@@ -1,10 +1,10 @@
 // 游戏核心逻辑
 
-import { Player } from './player.js';
+import { Druid } from './classes/druid.js';
 import { Enemy, spawnEnemy } from './enemy.js';
-import { Weapon } from './weapon.js';
 import { UI } from './ui.js';
 import { clamp, randomInt } from './utils.js';
+import { getRandomSkillOptions, createSkill, Anger, Moonfire } from './skills.js';
 
 class Game {
     constructor() {
@@ -27,7 +27,6 @@ class Game {
         // 游戏对象
         this.player = null;
         this.enemies = [];
-        this.weapons = [];
         this.projectiles = [];
         this.particles = [];
         
@@ -76,10 +75,22 @@ class Game {
                         break;
                 }
             }
+            
+            // 主动技能释放
+            if (this.gameState === 'playing' && e.code === 'KeyQ') {
+                this.activateActiveSkill();
+            }
         });
         
         document.addEventListener('keyup', (e) => {
             this.keys[e.code] = false;
+        });
+        
+        // 添加鼠标点击释放技能的事件监听
+        this.canvas.addEventListener('click', () => {
+            if (this.gameState === 'playing') {
+                this.activateActiveSkill();
+            }
         });
         
         // 技能选择事件
@@ -100,7 +111,7 @@ class Game {
     }
     
     setupStartMenuListeners() {
-        // 难度选择按钮
+        // 难度选择
         const difficultyBtns = document.querySelectorAll('.difficulty-btn');
         let selectedDifficulty = 'easy';
         
@@ -115,14 +126,36 @@ class Game {
             });
         });
         
+        // 职业选择
+        const classBtns = document.querySelectorAll('.class-btn');
+        let selectedClass = 'druid';
+        
+        classBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                // 移除所有按钮的active类
+                classBtns.forEach(b => b.classList.remove('active'));
+                // 添加当前按钮的active类
+                btn.classList.add('active');
+                // 保存选中的职业
+                selectedClass = btn.dataset.class;
+            });
+        });
+        
         // 开始游戏按钮
         document.getElementById('start-game-btn').addEventListener('click', () => {
             // 隐藏开始菜单
             document.getElementById('start-menu').classList.add('hidden');
-            // 初始化玩家
-            this.player = new Player(this.canvas.width / 2, this.canvas.height / 2);
+            // 初始化玩家（根据选择的职业）
+            this.player = new Druid(this.canvas.width / 2, this.canvas.height / 2);
             // 设置游戏难度
             this.setDifficulty(selectedDifficulty);
+            
+            // 添加初始技能：一级愤怒和一级月火术
+            const angerSkill = new Anger();
+            const moonfireSkill = new Moonfire();
+            this.player.addSkill(angerSkill);
+            this.player.addSkill(moonfireSkill);
+            
             // 开始游戏
             this.gameState = 'playing';
         });
@@ -189,9 +222,7 @@ class Game {
         }
         
         // 渲染游戏
-        if (this.gameState !== 'start') {
-            this.render();
-        }
+        this.render();
         
         // 继续下一帧
         requestAnimationFrame(this.gameLoop.bind(this));
@@ -207,6 +238,11 @@ class Game {
     }
     
     update() {
+        // 检查玩家是否存在
+        if (!this.player) {
+            return;
+        }
+        
         // 更新玩家
         this.player.update(this.keys, this.deltaTime, this.canvas);
         
@@ -246,10 +282,12 @@ class Game {
             }
         }
         
-        // 更新武器
-        this.player.weapons.forEach(weapon => {
-            weapon.update(this.player, this.enemies, this.deltaTime, this.projectiles);
-        });
+        // 更新技能
+        if (this.player.skills && Array.isArray(this.player.skills)) {
+            this.player.skills.forEach(skill => {
+                skill.update(this.player, this.enemies, this.deltaTime, this.projectiles);
+            });
+        }
         
         // 更新投射物
         for (let i = this.projectiles.length - 1; i >= 0; i--) {
@@ -267,7 +305,6 @@ class Game {
                 if (this.checkCollision(this.player, projectile)) {
                     this.player.takeDamage(projectile.damage);
                     this.projectiles.splice(i, 1);
-                    // 这里不需要额外的死亡检查，因为update方法末尾有通用检查
                     continue;
                 }
                 
@@ -277,25 +314,116 @@ class Game {
                     this.projectiles.splice(i, 1);
                     continue;
                 }
-            } else {
-                // 更新玩家投射物
-                projectile.update(this.deltaTime, this.enemies);
+            } else if (projectile.isEffect) {
+                // 处理特效投射物
+                projectile.duration -= this.deltaTime * 1000;
                 
-                // 检查爆炸是否结束
-                if (projectile.isExplosionFinished()) {
+                // 如果是附加在敌人身上的效果（月火、星火）
+                if (projectile.targetEnemy) {
+                    // 跟随敌人移动
+                    projectile.x = projectile.targetEnemy.x + projectile.targetEnemy.width / 2;
+                    projectile.y = projectile.targetEnemy.y + projectile.targetEnemy.height / 2;
+                    
+                    // 处理持续伤害
+                    if (projectile.dotDamage) {
+                        projectile.targetEnemy.takeDamage(projectile.dotDamage * this.deltaTime);
+                    }
+                }
+                
+                // 更新动画帧
+                if (projectile.animationFrames && projectile.animationFrames.length > 0 && !projectile.animationPlayed) {
+                    projectile.frameTimer += this.deltaTime;
+                    if (projectile.frameTimer >= projectile.frameRate) {
+                        projectile.currentFrame += 1;
+                        projectile.frameTimer = 0;
+                        
+                        // 如果动画播放完毕，标记为已播放
+                        if (projectile.currentFrame >= projectile.animationFrames.length - 1) {
+                            projectile.animationPlayed = true;
+                        }
+                    }
+                }
+                
+                // 检查是否结束
+                if (projectile.duration <= 0) {
                     this.projectiles.splice(i, 1);
                     continue;
                 }
+            } else if (projectile.isMeteor) {
+                if (!projectile.hasLanded) {
+                    // 处理陨石下落动画
+                    // 从右上方30°到60°随机往左下落下
+                    projectile.x -= Math.cos(projectile.angle) * projectile.speed * this.deltaTime;
+                    projectile.y += Math.sin(projectile.angle) * projectile.speed * this.deltaTime;
+                    
+                    // 检查是否到达目标位置或超时
+                    if (projectile.y >= projectile.targetY || projectile.duration <= 0) {
+                        // 标记为已落地
+                        projectile.hasLanded = true;
+                        
+                        // 更新位置为目标位置
+                        projectile.x = projectile.targetX;
+                        projectile.y = projectile.targetY;
+                        
+                        // 对范围内敌人造成瞬间伤害
+                        let hitCount = 0;
+                        for (const enemy of this.enemies) {
+                            const enemyCenterX = enemy.x + enemy.width / 2;
+                            const enemyCenterY = enemy.y + enemy.height / 2;
+                            const dist = Math.sqrt(
+                                Math.pow(projectile.targetX - enemyCenterX, 2) + 
+                                Math.pow(projectile.targetY - enemyCenterY, 2)
+                            );
+                            
+                            if (dist <= projectile.finalRadius) {
+                                enemy.takeDamage(projectile.finalDamage);
+                                hitCount++;
+                            }
+                        }
+                        
+                        console.log(`[${new Date().toISOString()}] 技能${projectile.skillName}陨石落地，对 ${hitCount} 个敌人造成 ${projectile.finalDamage.toFixed(2)} 伤害`);
+                        
+                        // 设置蓝圈持续时间为1秒
+                        projectile.duration = 1000;
+                        projectile.speed = 0;
+                        projectile.damage = 0; // 蓝圈持续期间无伤害
+                    } else {
+                        // 减少持续时间
+                        projectile.duration -= this.deltaTime * 1000;
+                    }
+                } else {
+                    // 处理落地后的蓝圈效果
+                    projectile.duration -= this.deltaTime * 1000;
+                    
+                    // 检查蓝圈效果是否结束
+                    if (projectile.duration <= 0) {
+                        this.projectiles.splice(i, 1);
+                    }
+                }
+            } else if (projectile.isMushroom) {
+                // 处理蘑菇投射物
+                projectile.duration -= this.deltaTime * 1000;
                 
-                // 检查玩家投射物是否超出屏幕
-                if (!projectile.isExploding && (projectile.x < 0 || projectile.x > this.canvas.width || 
-                    projectile.y < 0 || projectile.y > this.canvas.height)) {
-                    this.projectiles.splice(i, 1);
-                    continue;
+                // 持续伤害和减速效果
+                for (const enemy of this.enemies) {
+                    const enemyCenterX = enemy.x + enemy.width / 2;
+                    const enemyCenterY = enemy.y + enemy.height / 2;
+                    const dist = Math.sqrt(
+                        Math.pow(projectile.x - enemyCenterX, 2) + 
+                        Math.pow(projectile.y - enemyCenterY, 2)
+                    );
+                    
+                    if (dist <= projectile.collisionSize) {
+                        // 持续伤害
+                        enemy.takeDamage(projectile.damage * this.deltaTime);
+                        // 减速效果
+                        enemy.speed *= (1 - projectile.slowEffect);
+                    }
                 }
                 
-                // 处理爆炸伤害
-                if (projectile.isExploding && projectile.explosionRadius > 0) {
+                // 检查是否结束
+                if (projectile.duration <= 0) {
+                    // 爆炸伤害
                     for (const enemy of this.enemies) {
                         const enemyCenterX = enemy.x + enemy.width / 2;
                         const enemyCenterY = enemy.y + enemy.height / 2;
@@ -305,19 +433,268 @@ class Game {
                         );
                         
                         if (dist <= projectile.explosionRadius) {
-                            enemy.takeDamage(projectile.damage);
+                            enemy.takeDamage(projectile.explosionDamage);
                         }
+                    }
+                    this.projectiles.splice(i, 1);
+                    continue;
+                }
+            } else if (projectile.isElunesWrath) {
+                // 处理艾露恩之怒投射物
+                projectile.duration -= this.deltaTime * 1000;
+                
+                // 持续追踪最近的敌人
+                let closestEnemy = null;
+                let closestDistance = Infinity;
+                for (const enemy of this.enemies) {
+                    const enemyCenterX = enemy.x + enemy.width / 2;
+                    const enemyCenterY = enemy.y + enemy.height / 2;
+                    const dist = Math.sqrt(
+                        Math.pow(projectile.x - enemyCenterX, 2) + 
+                        Math.pow(projectile.y - enemyCenterY, 2)
+                    );
+                    
+                    if (dist < closestDistance) {
+                        closestDistance = dist;
+                        closestEnemy = enemy;
                     }
                 }
                 
-                // 检查玩家投射物是否击中敌人
-                if (!projectile.isExploding) {
+                // 跟随目标移动
+                if (closestEnemy) {
+                    projectile.x += (closestEnemy.x + closestEnemy.width / 2 - projectile.x) * 0.1;
+                    projectile.y += (closestEnemy.y + closestEnemy.height / 2 - projectile.y) * 0.1;
+                }
+                
+                // 持续范围伤害
+                for (const enemy of this.enemies) {
+                    const enemyCenterX = enemy.x + enemy.width / 2;
+                    const enemyCenterY = enemy.y + enemy.height / 2;
+                    const dist = Math.sqrt(
+                        Math.pow(projectile.x - enemyCenterX, 2) + 
+                        Math.pow(projectile.y - enemyCenterY, 2)
+                    );
+                    
+                    if (dist <= projectile.radius) {
+                        enemy.takeDamage(projectile.damage * this.deltaTime);
+                    }
+                }
+                
+                // 检查是否结束
+                if (projectile.duration <= 0) {
+                    this.projectiles.splice(i, 1);
+                    continue;
+                }
+            } else if (projectile.isEffect) {
+                // 效果投射物（月火、星火、艾露恩之怒等）
+                // 更新动画帧
+                if (projectile.animationFrames) {
+                    projectile.frameTimer += this.deltaTime;
+                    if (projectile.frameTimer >= projectile.frameRate) {
+                        projectile.currentFrame += projectile.frameDirection || 1; // 默认正向播放
+                        
+                        // 循环播放动画
+                        if (projectile.currentFrame >= projectile.animationFrames.length) {
+                            if (projectile.animationPlayed) {
+                                // 如果只需要播放一次，保持在最后一帧
+                                projectile.currentFrame = projectile.animationFrames.length - 1;
+                            } else {
+                                // 否则循环播放
+                                projectile.currentFrame = 0;
+                                projectile.animationPlayed = true;
+                            }
+                        }
+                        
+                        projectile.frameTimer = 0;
+                    }
+                }
+                
+                // 更新持续时间
+                if (projectile.duration !== undefined) {
+                    projectile.duration -= this.deltaTime * 1000; // 转换为毫秒
+                    
+                    // 处理持续伤害效果
+                    if (projectile.dotDamage && projectile.targetEnemy) {
+                        const damage = projectile.dotDamage * this.deltaTime;
+                        projectile.targetEnemy.takeDamage(damage);
+                        console.log(`[${new Date().toISOString()}] 技能${projectile.skillName}持续伤害：对敌人造成 ${damage.toFixed(2)} 伤害，敌人剩余生命值: ${projectile.targetEnemy.health.toFixed(2)}`);
+                        
+                        // 检查敌人是否死亡
+                        if (projectile.targetEnemy.health <= 0) {
+                            // 如果敌人死亡，移除效果
+                            this.projectiles.splice(i, 1);
+                            continue;
+                        }
+                    }
+                    
+                    // 检查效果是否结束
+                    if (projectile.duration <= 0) {
+                        this.projectiles.splice(i, 1);
+                        continue;
+                    }
+                }
+                
+                // 处理艾露恩之怒效果
+                if (projectile.isElunesWrath) {
+                    // 跟随目标移动 - 降低追踪速度
+                    if (projectile.target && projectile.target.health > 0) {
+                        // 计算目标中心位置
+                        const targetCenterX = projectile.target.x + projectile.target.width / 2;
+                        const targetCenterY = projectile.target.y + projectile.target.height / 2;
+                        
+                        // 计算当前位置与目标位置的差距
+                        const dx = targetCenterX - projectile.x;
+                        const dy = targetCenterY - projectile.y;
+                        
+                        // 降低追踪速度，0.3为追踪系数，数值越小速度越慢
+                        const trackingSpeed = 0.3;
+                        projectile.x += dx * trackingSpeed;
+                        projectile.y += dy * trackingSpeed;
+                    }
+                    
+                    // 对范围内敌人造成伤害
+                    for (const enemy of this.enemies) {
+                        const enemyCenterX = enemy.x + enemy.width / 2;
+                        const enemyCenterY = enemy.y + enemy.height / 2;
+                        const dist = Math.sqrt(
+                            Math.pow(projectile.x - enemyCenterX, 2) + 
+                            Math.pow(projectile.y - enemyCenterY, 2)
+                        );
+                        
+                        if (dist <= projectile.radius) {
+                            const damage = projectile.damage * this.deltaTime;
+                            enemy.takeDamage(damage);
+                            console.log(`[${new Date().toISOString()}] 技能${projectile.skillName}范围伤害：对敌人造成 ${damage.toFixed(2)} 伤害，敌人剩余生命值: ${enemy.health.toFixed(2)}`);
+                        }
+                    }
+                }
+            } else {                // 普通投射物（包括技能投射物）
+                // 更新动画帧
+                if (projectile.animationFrames) {
+                    projectile.frameTimer += this.deltaTime;
+                    if (projectile.frameTimer >= projectile.frameRate) {
+                        projectile.currentFrame += projectile.frameDirection || 1; // 默认正向播放
+                        
+                        // 12帧来回替换动画
+                        if (projectile.currentFrame >= projectile.animationFrames.length - 1) {
+                            projectile.frameDirection = -1; // 反向播放
+                        } else if (projectile.currentFrame <= 0) {
+                            projectile.frameDirection = 1; // 正向播放
+                        }
+                        
+                        projectile.frameTimer = 0;
+                    }
+                }
+                
+                if (projectile.update) {
+                    // 旧投射物系统的投射物
+                    projectile.update(this.deltaTime, this.enemies);
+                    
+                    // 检查爆炸是否结束
+                    if (projectile.isExplosionFinished()) {
+                        this.projectiles.splice(i, 1);
+                        continue;
+                    }
+                    
+                    // 检查玩家投射物是否超出屏幕
+                    if (!projectile.isExploding && (projectile.x < 0 || projectile.x > this.canvas.width || 
+                        projectile.y < 0 || projectile.y > this.canvas.height)) {
+                        this.projectiles.splice(i, 1);
+                        continue;
+                    }
+                    
+                    // 处理爆炸伤害
+                    if (projectile.isExploding && projectile.explosionRadius > 0) {
+                        for (const enemy of this.enemies) {
+                            const enemyCenterX = enemy.x + enemy.width / 2;
+                            const enemyCenterY = enemy.y + enemy.height / 2;
+                            const dist = Math.sqrt(
+                                Math.pow(projectile.x - enemyCenterX, 2) + 
+                                Math.pow(projectile.y - enemyCenterY, 2)
+                            );
+                            
+                            if (dist <= projectile.explosionRadius) {
+                                enemy.takeDamage(projectile.damage);
+                            }
+                        }
+                    }
+                } else {
+                    // 新技能系统的投射物
+                    // 如果速度是无限大，不更新位置（已经直接击中目标）
+                    if (projectile.speed !== Infinity) {
+                        // 更新位置
+                        const moveX = Math.cos(projectile.angle) * projectile.speed * this.deltaTime;
+                        const moveY = Math.sin(projectile.angle) * projectile.speed * this.deltaTime;
+                        projectile.x += moveX;
+                        projectile.y += moveY;
+                        
+                        // 检查是否超出屏幕
+                        if (projectile.x < 0 || projectile.x > this.canvas.width || 
+                            projectile.y < 0 || projectile.y > this.canvas.height) {
+                            this.projectiles.splice(i, 1);
+                            continue;
+                        }
+                    }
+                    
+                    // 处理击中逻辑
                     for (let j = this.enemies.length - 1; j >= 0; j--) {
                         const enemy = this.enemies[j];
                         if (this.checkCollision(projectile, enemy)) {
-                            enemy.takeDamage(projectile.damage);
-                            // 处理投射物的弹跳和爆炸
-                            if (projectile.handleHit(enemy, this.enemies)) {
+                            // 应用伤害，考虑玩家的法术伤害加成
+                            const finalDamage = projectile.damage * (1 + (this.player.spellDamageBonus || 0));
+                            const enemyHealthBefore = enemy.health;
+                            enemy.takeDamage(finalDamage);
+                            
+                            // 记录命中和伤害
+                            if (projectile.skillName) {
+                                projectile.hits++;
+                                projectile.totalDamage += finalDamage;
+                                console.log(`[${new Date().toISOString()}] 技能${projectile.skillName}击中敌人，造成 ${finalDamage.toFixed(2)} 伤害，累计命中 ${projectile.hits} 次，总伤害 ${projectile.totalDamage.toFixed(2)}`);
+                            }
+                            
+                            // 检查是否击杀敌人
+                            if (enemy.health <= 0 && enemyHealthBefore > 0) {
+                                console.log(`[${new Date().toISOString()}] 技能${projectile.skillName}击杀敌人，敌人剩余生命值: ${enemyHealthBefore.toFixed(2)}，造成总伤害: ${finalDamage.toFixed(2)}`);
+                            }
+                            
+                            // 处理范围伤害
+                            if (projectile.isAoE) {
+                                for (const otherEnemy of this.enemies) {
+                                    if (otherEnemy !== enemy) {
+                                        const otherEnemyCenterX = otherEnemy.x + otherEnemy.width / 2;
+                                        const otherEnemyCenterY = otherEnemy.y + otherEnemy.height / 2;
+                                        const dist = Math.sqrt(
+                                            Math.pow(enemy.x + enemy.width / 2 - otherEnemyCenterX, 2) + 
+                                            Math.pow(enemy.y + enemy.height / 2 - otherEnemyCenterY, 2)
+                                        );
+                                        
+                                        if (dist <= projectile.aoeRadius) {
+                                            const aoeDamage = projectile.aoeDamage * (1 + (this.player.spellDamageBonus || 0));
+                                            const aoeEnemyHealthBefore = otherEnemy.health;
+                                            otherEnemy.takeDamage(aoeDamage);
+                                            
+                                            // 记录范围伤害
+                                            if (projectile.skillName) {
+                                                console.log(`[${new Date().toISOString()}] 技能${projectile.skillName}范围伤害击中敌人，造成 ${aoeDamage.toFixed(2)} 伤害`);
+                                            }
+                                            
+                                            // 检查范围伤害是否击杀敌人
+                                            if (otherEnemy.health <= 0 && aoeEnemyHealthBefore > 0) {
+                                                console.log(`[${new Date().toISOString()}] 技能${projectile.skillName}范围伤害击杀敌人`);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // 处理穿透
+                            if (projectile.pierce !== undefined) {
+                                projectile.pierce--;
+                                if (projectile.pierce <= 0) {
+                                    this.projectiles.splice(i, 1);
+                                }
+                            } else {
+                                // 没有穿透属性，直接移除
                                 this.projectiles.splice(i, 1);
                             }
                             break;
@@ -335,7 +712,8 @@ class Game {
             expRequired: this.player.expRequired,
             level: this.player.level,
             score: this.score,
-            fps: this.fps
+            fps: this.fps,
+            skills: this.player.skills // 添加技能信息
         });
         
         // 检查玩家是否升级
@@ -350,43 +728,187 @@ class Game {
     }
     
     render() {
-        // 清空画布
-        this.ctx.fillStyle = '#2a2a2a';
+        // 清空画布，设置为黑色背景
+        this.ctx.fillStyle = '#000000';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
-        // 渲染玩家
-        this.player.render(this.ctx);
-        
-        // 渲染敌人
-        this.enemies.forEach(enemy => {
-            enemy.render(this.ctx);
-        });
-        
-        // 渲染投射物
-        this.projectiles.forEach(projectile => {
-            if (projectile.type === 'enemy') {
-                // 渲染敌人投射物
-                this.ctx.save();
-                this.ctx.fillStyle = projectile.color;
-                this.ctx.translate(projectile.x, projectile.y);
-                this.ctx.rotate(projectile.angle);
-                this.ctx.fillRect(-projectile.width / 2, -projectile.height / 2, projectile.width, projectile.height);
-                this.ctx.restore();
-            } else {
-                // 渲染玩家投射物
-                projectile.render(this.ctx);
-            }
-        });
-        
-        // 渲染武器
-        this.player.weapons.forEach(weapon => {
-            weapon.render(this.ctx, this.player);
-        });
-        
-        // 渲染粒子
-        this.particles.forEach(particle => {
-            particle.render(this.ctx);
-        });
+        // 只有当游戏状态不是开始菜单且玩家存在时，才渲染游戏元素
+        if (this.gameState !== 'start' && this.player) {
+            // 渲染玩家
+            this.player.render(this.ctx);
+            
+            // 渲染敌人
+            this.enemies.forEach(enemy => {
+                enemy.render(this.ctx);
+            });
+            
+            // 渲染投射物
+            this.projectiles.forEach(projectile => {
+                try {
+                    if (projectile.type === 'enemy') {
+                        // 渲染敌人投射物
+                        this.ctx.save();
+                        this.ctx.fillStyle = projectile.color;
+                        this.ctx.translate(projectile.x, projectile.y);
+                        this.ctx.rotate(projectile.angle);
+                        this.ctx.fillRect(-projectile.width / 2, -projectile.height / 2, projectile.width, projectile.height);
+                        this.ctx.restore();
+                    } else if (projectile.render) {
+                        // 渲染玩家投射物
+                        this.ctx.save();
+                        projectile.render(this.ctx);
+                        this.ctx.restore();
+                    } else {
+                        // 直接渲染投射物
+                        this.ctx.save();
+                        
+                        // 检查是否有动画帧
+                        if (projectile.animationFrames && projectile.animationFrames.length > 0) {
+                            // 渲染动画帧
+                            this.ctx.translate(projectile.x, projectile.y);
+                            
+                            // 如果有旋转角度，应用旋转
+                            if (projectile.angle !== undefined) {
+                                this.ctx.rotate(projectile.angle);
+                            }
+                            
+                            // 渲染当前帧
+                            const currentFrame = Math.floor(projectile.currentFrame);
+                            const frameImage = projectile.animationFrames[currentFrame];
+                            if (frameImage && frameImage.complete) {
+                                this.ctx.drawImage(
+                                    frameImage, 
+                                    -projectile.width / 2, 
+                                    -projectile.height / 2, 
+                                    projectile.width, 
+                                    projectile.height
+                                );
+                            } else {
+                                // 图像未加载完成，使用临时颜色渲染
+                                this.ctx.fillStyle = projectile.color || '#ff0000';
+                                this.ctx.fillRect(-projectile.width / 2, -projectile.height / 2, projectile.width, projectile.height);
+                            }
+                        } else if (projectile.isElunesWrath) {
+                            // 渲染艾露恩之怒效果
+                            this.ctx.translate(projectile.x, projectile.y);
+                            this.ctx.globalAlpha = 0.7;
+                            this.ctx.fillStyle = '#ffffff';
+                            this.ctx.beginPath();
+                            this.ctx.arc(0, 0, projectile.radius, 0, Math.PI * 2);
+                            this.ctx.fill();
+                            // 添加光晕效果
+                            this.ctx.fillStyle = '#ffff00';
+                            this.ctx.globalAlpha = 0.3;
+                            this.ctx.beginPath();
+                            this.ctx.arc(0, 0, projectile.radius * 1.5, 0, Math.PI * 2);
+                            this.ctx.fill();
+                            this.ctx.globalAlpha = 1;
+                        } else if (projectile.isEffect) {
+                            // 渲染效果投射物（月火、星火等）
+                            if (projectile.targetEnemy) {
+                                // 跟随敌人移动
+                                this.ctx.translate(projectile.targetEnemy.x + projectile.targetEnemy.width / 2, 
+                                                  projectile.targetEnemy.y + projectile.targetEnemy.height / 2);
+                            } else {
+                                this.ctx.translate(projectile.x, projectile.y);
+                            }
+                            
+                            if (projectile.animationFrames && projectile.animationFrames.length > 0) {
+                                // 渲染动画效果
+                                const currentFrame = Math.floor(projectile.currentFrame);
+                                const frameImage = projectile.animationFrames[currentFrame];
+                                if (frameImage && frameImage.complete) {
+                                    // 优先使用width和height属性，如果没有则使用collisionSize
+                                    const width = projectile.width || (projectile.collisionSize * 2);
+                                    const height = projectile.height || (projectile.collisionSize * 2);
+                                    this.ctx.drawImage(
+                                        frameImage, 
+                                        -width / 2, 
+                                        -height / 2, 
+                                        width, 
+                                        height
+                                    );
+                                } else {
+                                    // 图像未加载完成，使用临时颜色渲染
+                                    this.ctx.fillStyle = '#ffcc00';
+                                    this.ctx.beginPath();
+                                    this.ctx.arc(0, 0, projectile.collisionSize, 0, Math.PI * 2);
+                                    this.ctx.fill();
+                                }
+                            } else {
+                                // 没有动画帧，使用普通渲染
+                                this.ctx.fillStyle = projectile.color || '#ffcc00';
+                                this.ctx.beginPath();
+                                this.ctx.arc(0, 0, projectile.collisionSize, 0, Math.PI * 2);
+                                this.ctx.fill();
+                            }
+                        } else if (projectile.isMeteor) {
+                if (!projectile.hasLanded) {
+                    // 渲染陨石下落动画
+                    this.ctx.save();
+                    this.ctx.translate(projectile.x, projectile.y);
+                    this.ctx.fillStyle = projectile.color;
+                    this.ctx.fillRect(-projectile.width / 2, -projectile.height / 2, projectile.width, projectile.height);
+                    // 添加火焰尾迹
+                    this.ctx.fillStyle = '#ff6600';
+                    this.ctx.fillRect(-2, projectile.height / 2, 4, 20);
+                    this.ctx.restore();
+                } else {
+                    // 渲染落地后的蓝圈效果
+                    this.ctx.save();
+                    this.ctx.translate(projectile.x, projectile.y);
+                    
+                    // 绘制蓝圈
+                    this.ctx.strokeStyle = '#4444ff';
+                    this.ctx.lineWidth = 3;
+                    this.ctx.beginPath();
+                    this.ctx.arc(0, 0, projectile.finalRadius, 0, Math.PI * 2);
+                    this.ctx.stroke();
+                    
+                    // 绘制内部填充（半透明）
+                    this.ctx.fillStyle = 'rgba(68, 68, 255, 0.3)';
+                    this.ctx.beginPath();
+                    this.ctx.arc(0, 0, projectile.finalRadius, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    
+                    this.ctx.restore();
+                }
+            } else if (projectile.isMushroom) {
+                            // 渲染蘑菇效果
+                            this.ctx.translate(projectile.x, projectile.y);
+                            this.ctx.fillStyle = projectile.color;
+                            this.ctx.beginPath();
+                            this.ctx.arc(0, 0, projectile.width / 2, 0, Math.PI * 2);
+                            this.ctx.fill();
+                            // 添加减速效果指示器
+                            this.ctx.strokeStyle = '#87ceeb';
+                            this.ctx.setLineDash([5, 5]);
+                            this.ctx.beginPath();
+                            this.ctx.arc(0, 0, projectile.collisionSize, 0, Math.PI * 2);
+                            this.ctx.stroke();
+                            this.ctx.setLineDash([]);
+                        } else {
+                            // 渲染普通投射物
+                            this.ctx.translate(projectile.x, projectile.y);
+                            this.ctx.rotate(projectile.angle);
+                            this.ctx.fillStyle = projectile.color;
+                            this.ctx.fillRect(-projectile.width / 2, -projectile.height / 2, projectile.width, projectile.height);
+                        }
+                        
+                        this.ctx.restore();
+                    }
+                } catch (error) {
+                    // 捕获渲染错误，防止游戏崩溃
+                    console.error('投射物渲染错误:', error);
+                    this.ctx.restore();
+                }
+            });
+            
+            // 渲染粒子
+            this.particles.forEach(particle => {
+                particle.render(this.ctx);
+            });
+        }
     }
     
     updateEnemySpawner() {
@@ -413,11 +935,45 @@ class Game {
         this.score += enemy.scoreReward;
     }
     
+    // 激活主动技能
+    activateActiveSkill() {
+        // 遍历玩家的技能，找到主动技能
+        for (const skill of this.player.skills) {
+            if (skill.isActiveSkill) {
+                // 调用技能的activate方法
+                skill.activate(this.player, this.enemies, this.projectiles);
+                break;
+            }
+        }
+    }
+    
     checkCollision(obj1, obj2) {
-        return obj1.x < obj2.x + obj2.width &&
-               obj1.x + obj1.width > obj2.x &&
-               obj1.y < obj2.y + obj2.height &&
-               obj1.y + obj1.height > obj2.y;
+        // 碰撞体积：使用固定值，与图片大小无关
+        const obj1ColSize = obj1.collisionSize || 16;
+        const obj2ColSize = obj2.collisionSize || 16;
+
+        // 计算物体中心点（基于图片大小）
+        const obj1CenterX = obj1.x + obj1.width / 2;
+        const obj1CenterY = obj1.y + obj1.height / 2;
+        const obj2CenterX = obj2.x + obj2.width / 2;
+        const obj2CenterY = obj2.y + obj2.height / 2;
+
+        // 计算基于中心点的碰撞盒边界（使用固定碰撞体积）
+        const obj1Left = obj1CenterX - obj1ColSize / 2;
+        const obj1Right = obj1CenterX + obj1ColSize / 2;
+        const obj1Top = obj1CenterY - obj1ColSize / 2;
+        const obj1Bottom = obj1CenterY + obj1ColSize / 2;
+
+        const obj2Left = obj2CenterX - obj2ColSize / 2;
+        const obj2Right = obj2CenterX + obj2ColSize / 2;
+        const obj2Top = obj2CenterY - obj2ColSize / 2;
+        const obj2Bottom = obj2CenterY + obj2ColSize / 2;
+
+        // 使用矩形碰撞检测，完全基于固定碰撞体积和图片中心
+        return obj1Left < obj2Right &&
+               obj1Right > obj2Left &&
+               obj1Top < obj2Bottom &&
+               obj1Bottom > obj2Top;
     }
     
     enterLevelUp() {
@@ -430,11 +986,11 @@ class Game {
     }
     
     handleLevelUp(optionIndex) {
-        // 获取当前选中的武器类型
-        const selectedWeapon = this.currentLevelUpOptions[optionIndex];
+        // 获取当前选中的技能
+        const selectedSkill = this.currentLevelUpOptions[optionIndex];
         
-        // 为玩家添加或升级武器
-        this.player.addWeapon(selectedWeapon);
+        // 为玩家添加或升级技能
+        this.player.addSkill(selectedSkill);
         
         // 升级玩家
         this.player.levelUp();
@@ -444,16 +1000,10 @@ class Game {
         this.ui.hideLevelUpPanel();
     }
     
-    // 生成随机的升级选项（从4种武器中选择3种）
+    // 生成随机的升级选项（从技能池中选择3个技能）
     generateLevelUpOptions() {
-        // 所有可用武器类型
-        const allWeapons = ['knife', 'magicBall', 'whip', 'laser'];
-        
-        // 随机打乱武器顺序
-        const shuffledWeapons = [...allWeapons].sort(() => Math.random() - 0.5);
-        
-        // 选择前3种
-        this.currentLevelUpOptions = shuffledWeapons.slice(0, 3);
+        // 获取随机技能选项，传入玩家当前等级和职业
+        this.currentLevelUpOptions = getRandomSkillOptions(3, this.player.level, this.player.classType);
         
         // 更新UI显示
         this.updateLevelUpPanel();
@@ -464,31 +1014,23 @@ class Game {
         const optionsContainer = document.querySelector('.level-up-options');
         optionsContainer.innerHTML = '';
         
-        // 武器名称映射
-        const weaponNames = {
-            'knife': '飞刀',
-            'magicBall': '魔法球',
-            'whip': '环刃',
-            'laser': '激光炮'
-        };
-        
-        // 武器描述映射
-        const weaponDescriptions = {
-            'knife': '投掷锋利的飞刀攻击敌人，可弹跳',
-            'magicBall': '发射大型魔法球，击中后产生爆炸',
-            'whip': '旋转的环刃攻击周围的敌人',
-            'laser': '瞬间发射激光，穿透多个敌人'
-        };
-        
         // 创建选项元素
-        this.currentLevelUpOptions.forEach((weaponType, index) => {
+        this.currentLevelUpOptions.forEach((skill, index) => {
             const optionElement = document.createElement('div');
             optionElement.className = 'option';
             optionElement.dataset.option = index;
             
+            // 根据技能稀有度设置颜色
+            const rarityColor = skill.getRarityColor();
+            
             optionElement.innerHTML = `
-                <h3>${weaponNames[weaponType]}</h3>
-                <p>${weaponDescriptions[weaponType]}</p>
+                <h3 style="color: ${rarityColor};">${skill.name}</h3>
+                <p>${skill.description}</p>
+                <div class="skill-rarity" style="color: ${rarityColor};">
+                    稀有度: ${skill.rarity === 'common' ? '普通' : 
+                           skill.rarity === 'rare' ? '稀有' : 
+                           skill.rarity === 'epic' ? '史诗' : '传说'}
+                </div>
             `;
             
             // 添加点击事件监听
@@ -526,7 +1068,6 @@ class Game {
         
         // 清空游戏对象
         this.enemies = [];
-        this.weapons = [];
         this.projectiles = [];
         this.particles = [];
         this.player = null;
@@ -539,5 +1080,5 @@ class Game {
     }
 }
 
-// 导出游戏实例
-export const game = new Game();
+// 导出Game类
+export { Game };
