@@ -718,20 +718,21 @@ export class Starfall extends Skill {
     cast(player, enemies, projectiles) {
         console.log(`[${new Date().toISOString()}] 释放技能: ${this.name}`);
         
-        // 从右上方30°到60°随机角度落下
+        // 从更广阔的上方区域随机角度落下，增加位置随机性
         const canvas = player.canvas || { width: 800, height: 600 };
         
-        // 生成位置在屏幕右上方
-        const startX = canvas.width + Math.random() * 100;
-        const startY = Math.random() * (canvas.height * 0.3); // 屏幕上半部分
+        // 生成位置在屏幕右侧更广阔的区域，增加X方向随机性
+        const startX = canvas.width + Math.random() * 200 - 100; // 屏幕右侧外-100px到100px
+        // 生成位置在屏幕上方整个高度范围，增加Y方向随机性
+        const startY = Math.random() * canvas.height * 0.5 - 100; // 屏幕上方-100px到屏幕高度50%
         
-        // 随机角度30°到60°（转换为弧度）
-        const minAngle = Math.PI / 6; // 30°
-        const maxAngle = Math.PI / 3; // 60°
+        // 随机角度20°到70°（转换为弧度），增加角度随机性
+        const minAngle = Math.PI / 9; // 20°
+        const maxAngle = Math.PI / 2.57; // 70°
         const angle = minAngle + Math.random() * (maxAngle - minAngle);
         
         // 计算目标位置
-        const distance = Math.max(canvas.width, canvas.height);
+        const distance = Math.max(canvas.width, canvas.height) * 1.5; // 增加距离，扩大覆盖范围
         const targetX = startX - Math.cos(angle) * distance;
         const targetY = startY + Math.sin(angle) * distance;
         
