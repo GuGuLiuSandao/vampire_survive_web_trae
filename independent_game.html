@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>魔兽生存 - 纯绘图版</title>
+    <style>
+        /* 基础重置 */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: #121212; color: #e0e0e0; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; user-select: none; }
+        
+        /* --- 游戏容器扩大 --- */
+        .game-container { 
+            position: relative; 
+            width: 1280px; 
+            height: 720px;
+            border: 2px solid #444; 
+            border-radius: 8px; 
+            overflow: hidden; 
+            background-color: #1e1e1e; 
+            box-shadow: 0 0 30px rgba(0,0,0,0.7); 
+            max-width: 98vw;
+            max-height: 98vh;
+        }
+        
+        #gameCanvas { display: block; background-color: #252525; width: 100%; height: 100%; }
+        #ui-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        
+        /* UI 元素样式 */
+        .top-bar { position: absolute; top: 0; left: 0; width: 100%; background-color: rgba(0, 0, 0, 0.6); padding: 10px 15px; display: flex; flex-direction: column; gap: 5px; z-index: 100; backdrop-filter: blur(2px); }
+        .stat-bar { width: 100%; height: 20px; background-color: #333; border-radius: 10px; position: relative; overflow: hidden; border: 1px solid #555; }
+        .stat-fill { height: 100%; transition: width 0.2s ease-out; }
+        .health-fill { background: linear-gradient(90deg, #ff4444, #cc0000); width: 100%; }
+        .exp-fill { background: linear-gradient(90deg, #4444ff, #0000cc); width: 0%; }
+        .stat-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 12px; font-weight: bold; color: #fff; text-shadow: 1px 1px 2px #000; z-index: 2; }
+        
+        .bottom-left-panel { 
+            position: absolute; bottom: 15px; left: 15px; background-color: rgba(0, 0, 0, 0.6); padding: 12px; border-radius: 8px; min-width: 180px; z-index: 100; border: 1px solid #444; backdrop-filter: blur(2px); pointer-events: auto; transition: all 0.3s ease;
+        }
+        .bottom-left-panel.collapsed { min-width: 40px; width: 40px; height: 40px; padding: 0; overflow: hidden; background-color: rgba(0, 0, 0, 0.3); }
+        .bottom-left-panel.collapsed .panel-content { opacity: 0; pointer-events: none; }
+        .toggle-btn { position: absolute; top: 5px; right: 5px; width: 20px; height: 20px; background: rgba(255, 255, 255, 0.1); border: 1px solid #666; color: #fff; font-size: 12px; line-height: 1; cursor: pointer; border-radius: 4px; display: flex; justify-content: center; align-items: center; }
+        .toggle-btn:hover { background: rgba(255, 255, 255, 0.3); }
+        .bottom-left-panel.collapsed .toggle-btn { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+
+        .info-row { font-size: 14px; margin-bottom: 4px; color: #ddd; font-weight: 500; }
+        .debug-hint { color: #ffff00; font-size: 12px; margin-top: 5px; opacity: 0.8; }
+        .skills-list { margin-top: 8px; border-top: 1px solid #555; padding-top: 8px; max-height: 200px; overflow-y: auto; }
+        .skill-item { font-size: 12px; margin-bottom: 2px; }
+        
+        .ult-skill-container { position: absolute; bottom: 20px; right: 20px; width: 64px; height: 64px; border-radius: 50%; border: 2px solid #ffcc00; background-color: rgba(0,0,0,0.5); overflow: hidden; display: none; pointer-events: auto; cursor: pointer; }
+        .ult-icon { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 24px; color: #ffcc00; background: radial-gradient(circle, #444, #222); }
+        .ult-cooldown-mask { position: absolute; bottom: 0; left: 0; width: 100%; height: 0%; background-color: rgba(0, 0, 0, 0.7); transition: height 0.1s linear; }
+        .ult-key-hint { position: absolute; bottom: -5px; right: -5px; background-color: #333; color: #fff; border-radius: 4px; padding: 2px 5px; font-size: 10px; border: 1px solid #666; }
+        
+        .modal-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; z-index: 2000; backdrop-filter: blur(5px); pointer-events: auto; }
+        .modal-content { background-color: #222; border: 2px solid #ffcc00; border-radius: 12px; padding: 25px; width: 650px; text-align: center; box-shadow: 0 0 40px rgba(255, 204, 0, 0.15); }
+        .modal-title { color: #ffcc00; font-size: 28px; margin-bottom: 25px; text-shadow: 0 0 10px rgba(255, 204, 0, 0.5); }
+        .options-container { display: flex; gap: 15px; justify-content: center; }
+        .card { flex: 1; background: linear-gradient(145deg, #2a2a2a, #333); border: 1px solid #444; border-radius: 8px; padding: 15px; cursor: pointer; transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; display: flex; flex-direction: column; align-items: center; min-height: 200px; position: relative; }
+        .card:hover { transform: translateY(-5px); border-color: #ffcc00; box-shadow: 0 5px 15px rgba(0,0,0,0.5); background: linear-gradient(145deg, #333, #3a3a3a); }
+        .card-key { position: absolute; top: 8px; left: 8px; background: #ffcc00; color: #000; width: 20px; height: 20px; border-radius: 50%; font-weight: bold; display: flex; justify-content: center; align-items: center; font-size: 12px; }
+        .card h3 { margin: 15px 0 10px; font-size: 18px; }
+        .card p { font-size: 13px; color: #bbb; line-height: 1.4; flex-grow: 1; margin-bottom: 10px; }
+        .rarity-tag { font-size: 11px; padding: 2px 8px; border-radius: 4px; background-color: #111; margin-top: auto; text-transform: uppercase; font-weight: bold; }
+        .menu-container { text-align: center; color: white; }
+        .menu-title { font-size: 48px; color: #ffcc00; margin-bottom: 40px; text-shadow: 0 0 20px rgba(255, 204, 0, 0.6); }
+        .btn-group { margin-bottom: 30px; }
+        .btn-group h3 { margin-bottom: 15px; color: #aaa; font-size: 16px; }
+        .btn { background: transparent; border: 1px solid #666; color: #ccc; padding: 10px 20px; margin: 0 5px; cursor: pointer; border-radius: 4px; font-size: 16px; transition: all 0.2s; }
+        .btn:hover { border-color: #ffcc00; color: #fff; background-color: rgba(255, 204, 0, 0.1); }
+        .btn.active { background-color: #ffcc00; color: #000; border-color: #ffcc00; font-weight: bold; }
+        .start-btn { background: linear-gradient(to bottom, #4444ff, #0000cc); border: none; padding: 15px 40px; font-size: 20px; color: white; border-radius: 6px; cursor: pointer; box-shadow: 0 4px 15px rgba(0, 0, 255, 0.3); margin-top: 20px; pointer-events: auto; }
+        .start-btn:hover { transform: scale(1.05); box-shadow: 0 6px 20px rgba(0, 0, 255, 0.5); }
+        
+        /* 测试模式按钮样式 */
+        .test-btn {
+            background: linear-gradient(to bottom, #9c27b0, #6a1b9a);
+            border: none;
+            padding: 10px 30px;
+            font-size: 16px;
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(156, 39, 176, 0.3);
+            margin-top: 15px;
+            pointer-events: auto;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            transition: all 0.2s;
+        }
+        .test-btn:hover { transform: scale(1.05); box-shadow: 0 6px 20px rgba(156, 39, 176, 0.5); }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <canvas id="gameCanvas" width="1280" height="720"></canvas>
+    <div id="ui-container">
+        <!-- HUD -->
+        <div id="hud" class="hidden">
+            <div class="top-bar">
+                <div class="stat-bar"><div class="stat-fill health-fill" id="hp-bar"></div><span class="stat-text" id="hp-text">100 / 100</span></div>
+                <div class="stat-bar" style="height: 12px; margin-top: 2px;"><div class="stat-fill exp-fill" id="exp-bar"></div><span class="stat-text" style="font-size: 10px;" id="exp-text">0 / 20</span></div>
+            </div>
+            <div class="bottom-left-panel" id="stats-panel">
+                <div class="toggle-btn" id="toggle-stats-btn">-</div>
+                <div class="panel-content">
+                    <div class="info-row">等级: <span id="level-val" style="color:#ffcc00">1</span></div>
+                    <div class="info-row">得分: <span id="score-val">0</span></div>
+                    <div class="info-row">时间: <span id="time-val">00:00</span></div>
+                    <div class="debug-hint">P键: 切换调试模式</div>
+                    <div class="skills-list" id="skills-list"></div>
+                </div>
+            </div>
+            <div class="ult-skill-container" id="ult-btn">
+                <div class="ult-icon">⚡</div>
+                <div class="ult-cooldown-mask" id="ult-mask"></div>
+                <div class="ult-key-hint">Q</div>
+            </div>
+        </div>
+        <div id="levelup-modal" class="modal-overlay hidden"><div class="modal-content"><h2 class="modal-title" id="levelup-title">升级！选择奖励</h2><div class="options-container" id="levelup-options"></div></div></div>
+        <div id="gameover-modal" class="modal-overlay hidden"><div class="modal-content" style="width: 400px;"><h2 class="modal-title" style="color: #ff4444;">游戏结束</h2><p style="font-size: 18px; margin-bottom: 10px;">最终得分: <span id="final-score" style="color: #ffcc00; font-weight: bold;">0</span></p><p style="font-size: 16px; margin-bottom: 30px; color: #aaa;">生存时间: <span id="final-time">00:00</span></p><button class="start-btn" id="restart-btn">重新开始</button></div></div>
+        
+        <!-- 开始菜单 -->
+        <div id="start-menu" class="modal-overlay">
+            <div class="menu-container">
+                <h1 class="menu-title">魔兽生存</h1>
+                <div class="btn-group"><h3>选择职业</h3><button class="btn active">德鲁伊</button></div>
+                
+                <!-- 难度选择 -->
+                <div class="btn-group" id="difficulty-group">
+                    <h3>选择难度</h3>
+                    <!-- 关键修复：直接在JS里绑定事件，HTML只负责结构 -->
+                    <button class="btn active" id="diff-easy">简单</button>
+                    <button class="btn" id="diff-normal">普通</button>
+                    <button class="btn" id="diff-hard">困难</button>
+                </div>
+                
+                <button class="start-btn" id="start-game-btn">开始游戏</button>
+                <button class="test-btn" id="test-game-btn">测试模式 (2:30/15级/全技能)</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// --- 工具函数 ---
+const Utils = {
+    rand(min, max) { return Math.random() * (max - min) + min; },
+    randInt(min, max) { return Math.floor(this.rand(min, max)); },
+    dist(x1, y1, x2, y2) { return Math.sqrt((x2-x1)**2 + (y2-y1)**2); },
+    angle(x1, y1, x2, y2) { return Math.atan2(y2-y1, x2-x1); },
+    clamp(v, min, max) { return Math.max(min, Math.min(max, v)); },
+    colRect(r1, r2) { return r1.x < r2.x + r2.w && r1.x + r1.w > r2.x && r1.y < r2.y + r2.h && r1.y + r1.h > r2.y; },
+    fmtTime(s) { const m = Math.floor(s/60).toString().padStart(2,'0'); const sc = Math.floor(s%60).toString().padStart(2,'0'); return `${m}:${sc}`; }
+};
+
+// --- 全局配置 ---
+const CFG = {
+    w: 1280, h: 720,
+    colors: { bg: '#252525', player: '#4caf50', enemyBasic: '#e53935', enemyFast: '#ff9800', enemyTank: '#5d4037', enemyRanger: '#9c27b0', exp: '#2196f3', text: '#ffffff' },
+    rarityColors: { common: '#eee', rare: '#42a5f5', epic: '#ab47bc', legendary: '#ffca28' }
+};
+
+// 难度配置
+const DIFFICULTY_SETTINGS = {
+    easy: { spawnRate: 1.2, hpMult: 0.8, dmgMult: 0.8, maxEnemies: 50 },
+    normal: { spawnRate: 1.0, hpMult: 1.0, dmgMult: 1.0, maxEnemies: 80 },
+    hard: { spawnRate: 0.6, hpMult: 1.5, dmgMult: 1.5, maxEnemies: 120 }
+};
+
+// --- 辅助函数 ---
+function getNearest(obj, enemies, range) {
+    let t = null, minDist = range;
+    const ox = obj.cx !== undefined ? obj.cx : obj.x;
+    const oy = obj.cy !== undefined ? obj.cy : obj.y;
+    for(const e of enemies) {
+        if(e.dead) continue;
+        const d = Utils.dist(ox, oy, e.cx, e.cy);
+        if(d < minDist) { minDist = d; t = e; }
+    }
+    return t;
+}
+
+function getRandom(p, enemies, range) {
+    const list = enemies.filter(e => !e.dead && Utils.dist(p.cx, p.cy, e.cx, e.cy) < range);
+    if(list.length) return list[Utils.randInt(0, list.length)];
+    return null;
+}
+
+// --- 粒子/浮动文字系统 ---
+class Particle {
+    constructor(x, y, color, size, life, speed, angle) {
+        this.x = x; this.y = y; this.color = color; this.size = size; this.maxLife = life; this.life = life;
+        this.vx = Math.cos(angle) * speed; this.vy = Math.sin(angle) * speed; this.decay = 0.95;
+    }
+    update(dt) { this.x += this.vx * dt * 60; this.y += this.vy * dt * 60; this.vx *= this.decay; this.vy *= this.decay; this.life -= dt; }
+    render(ctx) { ctx.globalAlpha = Math.max(0, this.life / this.maxLife); ctx.fillStyle = this.color; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha = 1; }
+}
+
+class FloatingText {
+    constructor(x, y, text, color, life = 1.0) {
+        this.x = x; this.y = y; this.text = text; this.color = color;
+        this.life = life; this.maxLife = life; this.vy = -20;
+    }
+    update(dt) { this.y += this.vy * dt; this.life -= dt; }
+    render(ctx) {
+        ctx.globalAlpha = Math.max(0, this.life / this.maxLife);
+        ctx.fillStyle = this.color; ctx.font = "bold 20px Arial"; ctx.textAlign = "center";
+        ctx.fillText(this.text, this.x, this.y); ctx.globalAlpha = 1;
+    }
+}
+
+class ParticleSystem {
+    constructor() { this.particles = []; }
+    spawn(x, y, count, color, speedBase=2) { for(let i=0; i<count; i++) { const angle = Math.random() * Math.PI * 2; const speed = Math.random() * speedBase; const size = Math.random() * 3 + 1; const life = Math.random() * 0.5 + 0.3; this.particles.push(new Particle(x, y, color, size, life, speed, angle)); } }
+    spawnTrail(x, y, color, size, lifeTime = 0.3) { this.particles.push(new Particle(x, y, color, size, lifeTime, 0, 0)); }
+    update(dt) { for(let i=this.particles.length-1; i>=0; i--) { const p = this.particles[i]; p.update(dt); if(p.life <= 0) this.particles.splice(i, 1); } }
+    render(ctx) { this.particles.forEach(p => p.render(ctx)); }
+}
+
+class Entity {
+    constructor(x, y, w, h, color) { this.x = x; this.y = y; this.w = w; this.h = h; this.color = color; this.dead = false; }
+    get cx() { return this.x + this.w/2; }
+    get cy() { return this.y + this.h/2; }
+    render(ctx, debug) { ctx.fillStyle = this.color; ctx.fillRect(this.x, this.y, this.w, this.h); if(debug) { ctx.strokeStyle = 'red'; ctx.strokeRect(this.x, this.y, this.w, this.h); } }
+}
+
+class Player extends Entity {
+    constructor(x, y) {
+        super(x, y, 32, 32, CFG.colors.player);
+        this.speed = 150; this.hp = 100; this.maxHp = 100; this.exp = 0; this.expReq = 20; this.lvl = 1; this.skills = [];
+        this.spellDmg = 1.0; this.cdr = 1.0; this.damageReduction = 0; this.hasSunfire = false; this.burnBonus = 0; this.facing = 1; this.animTimer = 0;
+        this.hasWrathExplosion = false; this.hasMoonfireWrath = false; this.wrathDamageMult = 1.0; this.wrathCdReduction = 0;
+        this.eluneLightCooldown = 0;
+    }
+    update(dt, keys, w, h) {
+        let dx = 0, dy = 0;
+        if(keys['KeyW'] || keys['ArrowUp']) dy = -1; if(keys['KeyS'] || keys['ArrowDown']) dy = 1;
+        if(keys['KeyA'] || keys['ArrowLeft']) dx = -1; if(keys['KeyD'] || keys['ArrowRight']) dx = 1;
+        if(dx !== 0 || dy !== 0) { const l = Math.sqrt(dx*dx + dy*dy); this.x += (dx/l) * this.speed * dt; this.y += (dy/l) * this.speed * dt; if(dx !== 0) this.facing = dx > 0 ? 1 : -1; }
+        this.x = Utils.clamp(this.x, 0, w - this.w); this.y = Utils.clamp(this.y, 0, h - this.h);
+        if(this.eluneLightCooldown > 0) this.eluneLightCooldown -= dt;
+    }
+    render(ctx, debug) {
+        ctx.save(); ctx.translate(this.cx, this.cy);
+        const scale = 1 + Math.sin(Date.now() * 0.005) * 0.05; ctx.scale(scale * this.facing, scale);
+        ctx.fillStyle = this.color; ctx.fillRect(-16, -16, 32, 32);
+        ctx.fillStyle = 'white'; ctx.fillRect(4, -8, 8, 8);
+        ctx.fillStyle = '#81c784'; ctx.beginPath(); ctx.moveTo(0, -16); ctx.lineTo(10, -26); ctx.lineTo(-10, -26); ctx.fill();
+        ctx.restore();
+        if(debug) super.render(ctx, true);
+    }
+    takeDamage(amount) { this.hp -= amount * (1 - this.damageReduction); }
+    gainExp(amt) { this.exp += amt; }
+}
+
+class Enemy extends Entity {
+    constructor(x, y, type, diffMultiplier = 1.0, dmgMultiplier = 1.0) {
+        let size = 30, color = CFG.colors.enemyBasic, hp = 10, spd = 60, exp = 10, dmg = 5;
+        if(type === 'fast') { size = 24; color = CFG.colors.enemyFast; hp = 5; spd = 110; exp = 15; dmg = 3; }
+        if(type === 'tank') { size = 40; color = CFG.colors.enemyTank; hp = 40; spd = 30; exp = 30; dmg = 15; }
+        if(type === 'ranger') { size = 28; color = CFG.colors.enemyRanger; hp = 8; spd = 50; exp = 20; dmg = 8; }
+        hp = Math.floor(hp * diffMultiplier);
+        dmg = Math.floor(dmg * dmgMultiplier);
+        super(x, y, size, size, color);
+        this.type = type; this.hp = hp; this.maxHp = hp; this.speed = spd; this.baseSpeed = spd; this.expVal = exp; this.dmg = dmg; this.dotEffects = [];
+        this.attackRange = 300; this.attackCooldown = 2.0; this.attackTimer = Math.random() * 2.0;
+    }
+    update(dt, p, projs) {
+        const d = Utils.dist(this.cx, this.cy, p.cx, p.cy);
+        if (this.type === 'ranger') {
+            if (d > this.attackRange) { const ang = Utils.angle(this.cx, this.cy, p.cx, p.cy); this.x += Math.cos(ang) * this.speed * dt; this.y += Math.sin(ang) * this.speed * dt; }
+            else if (d < this.attackRange * 0.7) { const ang = Utils.angle(this.cx, this.cy, p.cx, p.cy); this.x -= Math.cos(ang) * (this.speed * 0.8) * dt; this.y -= Math.sin(ang) * (this.speed * 0.8) * dt; }
+            this.attackTimer -= dt;
+            if (this.attackTimer <= 0 && d <= this.attackRange + 50) { this.attack(p, projs); this.attackTimer = this.attackCooldown; }
+        } else {
+            const ang = Utils.angle(this.cx, this.cy, p.cx, p.cy); this.x += Math.cos(ang) * this.speed * dt; this.y += Math.sin(ang) * this.speed * dt;
+        }
+        this.speed = this.baseSpeed;
+        if(Math.random() < 0.05) this.dotEffects = [];
+    }
+    attack(target, projs) {
+        const ang = Utils.angle(this.cx, this.cy, target.cx, target.cy);
+        projs.push(new Projectile({ x: this.cx, y: this.cy, angle: ang, speed: 200, damage: this.dmg, color: '#e040fb', size: 5, behavior: 'enemy_bullet', life: 3, isEnemyProj: true }));
+    }
+    render(ctx, debug) {
+        ctx.fillStyle = this.color; ctx.fillRect(this.x, this.y, this.w, this.h);
+        if (this.type === 'ranger') { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(this.x + 4, this.y + 4, this.w - 8, this.h - 8); }
+        const pct = Math.max(0, this.hp / this.maxHp); ctx.fillStyle = '#333'; ctx.fillRect(this.x, this.y - 8, this.w, 4); ctx.fillStyle = '#f44'; ctx.fillRect(this.x, this.y - 8, this.w * pct, 4);
+        if(debug) super.render(ctx, true);
+    }
+    takeDamage(amount, source) { this.hp -= amount; if(source && !this.dotEffects.includes(source)) this.dotEffects.push(source); if(this.hp <= 0) this.dead = true; }
+}
+
+class Projectile {
+    constructor(props) { Object.assign(this, props); this.life = props.life !== undefined ? props.life : 5; this.maxLife = this.life; this.remove = false; this.hasHit = []; }
+    update(dt, enemies, particles, player, projs) {
+        // [修复] 蘑菇减速逻辑移动到最外层，确保每一帧执行
+        if (!this.remove && this.isMushroom) {
+             for(const e of enemies) {
+                if(e.dead) continue;
+                if(Utils.dist(this.x, this.y, e.cx, e.cy) < this.range) { 
+                    e.speed = e.baseSpeed * 0.8; // 20% 减速
+                }
+             }
+        }
+
+        if(this.remove) return;
+        this.life -= dt;
+        if(this.life <= 0) {
+            if (this.isMushroom) {
+                let explosionDmg = this.explosionDamage * player.spellDmg;
+                for(const e of enemies) {
+                    if(e.dead) continue;
+                    if(Utils.dist(this.x, this.y, e.cx, e.cy) < this.explosionRadius) { 
+                        if(e.dotEffects.length > 0) explosionDmg *= (1 + player.burnBonus);
+                        e.takeDamage(explosionDmg);
+                    }
+                }
+                particles.spawn(this.x, this.y, 30, '#00ff00', 6);
+            }
+            if (this.isWrathBeam && this.hasExplosion) {
+                for(const e of enemies) {
+                    if(e.dead) continue;
+                    if (Utils.dist(this.x, this.y, e.cx, e.cy) < 800) e.takeDamage(300 * player.spellDmg);
+                }
+                for(let i=0; i<30; i++) { const ang = Math.random() * Math.PI * 2; const dist = Math.random() * 200; particles.spawn(this.x + Math.cos(ang)*dist, this.y + Math.sin(ang)*dist, 10, '#fff', 5); }
+                particles.spawn(this.x, this.y, 50, '#fff', 10);
+            }
+            this.remove = true; return;
+        }
+
+        if(this.behavior === 'linear') {
+            this.x += Math.cos(this.angle) * this.speed * dt; this.y += Math.sin(this.angle) * this.speed * dt;
+            if(Math.random() < 0.3) particles.spawnTrail(this.x, this.y, this.color, this.size*0.6);
+            if (this.isStarsurge) particles.spawnTrail(this.x, this.y, this.color, this.size*0.8, 0.5);
+        } else if (this.behavior === 'enemy_bullet') {
+            this.x += Math.cos(this.angle) * this.speed * dt; this.y += Math.sin(this.angle) * this.speed * dt;
+            if (Utils.dist(this.x, this.y, player.cx, player.cy) < (this.size + player.w/2)) { player.takeDamage(this.damage); particles.spawn(player.cx, player.cy, 5, '#ff0000'); this.remove = true; }
+        } else if(this.behavior === 'follow') {
+            if(this.target && !this.target.dead) { this.x = this.target.cx; this.y = this.target.cy - 30; } else { this.remove = true; }
+        } else if(this.behavior === 'typhoon_wave') {
+            this.x += Math.cos(this.angle) * this.speed * dt; this.y += Math.sin(this.angle) * this.speed * dt;
+            if(Math.random() < 0.5) particles.spawnTrail(this.x, this.y, 'rgba(135, 206, 235, 0.5)', this.size * 0.5, 0.2);
+        } else if(this.behavior === 'starfall') {
+            this.x += Math.cos(this.angle) * this.speed * dt; this.y += Math.sin(this.angle) * this.speed * dt;
+            particles.spawnTrail(this.x, this.y, '#ffffff', this.size * 0.5);
+            if (this.y > CFG.h + 50 || this.x < -50) this.remove = true;
+        } else if(this.behavior === 'wrath_beam') {
+            const target = getNearest(this, enemies, 900);
+            if (target) {
+                const angle = Utils.angle(this.x, this.y, target.cx, target.cy);
+                const moveSpeed = 120; 
+                this.x += Math.cos(angle) * moveSpeed * dt;
+                this.y += Math.sin(angle) * moveSpeed * dt;
+            }
+            this.attackTimer = (this.attackTimer || 0) + dt;
+            if (this.attackTimer > 0.2) { 
+                this.attackTimer = 0;
+                particles.spawn(this.x, this.y, 20, '#ffffff', 8);
+                particles.spawn(this.x, this.y, 15, '#87ceeb', 5);
+                projs.push(new Projectile({ x: this.x, y: this.y, behavior: 'stationary', life: 0.15, isWrathExplosion: true, radius: this.radius, color: '#fff' }));
+                const dmg = this.damage * player.spellDmg;
+                for(const e of enemies) { if (e.dead) continue; if (Utils.dist(this.x, this.y, e.cx, e.cy) < this.radius) { e.takeDamage(dmg); } }
+            }
+        }
+
+        if (this.isEnemyProj) return;
+
+        if(this.behavior === 'linear') {
+            for(const e of enemies) {
+                if(e.dead || this.hasHit.includes(e)) continue;
+                if(Utils.dist(this.x, this.y, e.cx, e.cy) < (this.size + e.w/2)) {
+                    let finalDmg = this.damage * player.spellDmg;
+                    if (e.dotEffects.length > 0) finalDmg *= (1 + player.burnBonus);
+                    
+                    e.takeDamage(finalDmg);
+                    particles.spawn(e.cx, e.cy, 5, '#fff');
+                    if(!this.pierce) { this.remove = true; break; }
+                    this.hasHit.push(e);
+                }
+            }
+        } else if(this.behavior === 'starfall') {
+            for(const e of enemies) {
+                if(e.dead) continue;
+                if(Utils.dist(this.x, this.y, e.cx, e.cy) < (this.size + e.w/2)) {
+                    let finalDmg = this.damage * player.spellDmg;
+                    const aoeRadius = 60;
+                    for(const target of enemies) {
+                        if(target.dead) continue;
+                        if(Utils.dist(this.x, this.y, target.cx, target.cy) < aoeRadius) {
+                            let d = finalDmg;
+                            if (target.dotEffects.length > 0) d *= (1 + player.burnBonus);
+                            target.takeDamage(d);
+                        }
+                    }
+                    particles.spawn(this.x, this.y, 15, '#87ceeb', 4); 
+                    projs.push(new Projectile({ x: this.x, y: this.y, behavior: 'stationary', life: 0.3, isAreaIndicator: true, radius: 60, color: '#87ceeb' }));
+                    this.remove = true;
+                    break;
+                }
+            }
+        } else if(this.behavior === 'typhoon_wave') {
+            for(const e of enemies) {
+                if(e.dead) continue;
+                if(Utils.dist(this.x, this.y, e.cx, e.cy) < this.size + e.w) {
+                    const pushDist = 150 * dt * 5; 
+                    e.x += Math.cos(this.angle) * pushDist;
+                    e.y += Math.sin(this.angle) * pushDist;
+                    if(Math.random() < 0.2) particles.spawn(e.cx, e.cy, 2, '#fff', 1);
+                }
+            }
+        } else if(this.dotInterval) {
+            this.timer = (this.timer || 0) + dt;
+            if(this.timer > this.dotInterval) {
+                this.timer = 0;
+                if(this.behavior === 'follow') {
+                    if(this.target && !this.target.dead) {
+                        let finalDmg = this.damage * player.spellDmg; 
+                        this.target.takeDamage(finalDmg, this.sourceId); 
+                        particles.spawn(this.target.cx, this.target.cy, 2, this.color);
+                    }
+                } else if (this.range) {
+                    for(const e of enemies) {
+                        if(e.dead) continue;
+                        if(Utils.dist(this.x, this.y, e.cx, e.cy) < this.range) {
+                            let finalDmg = this.damage * player.spellDmg;
+                            if (e.dotEffects.length > 0) finalDmg *= (1 + player.burnBonus);
+                            e.takeDamage(finalDmg);
+                            if(this.slow) e.speed *= (1 - this.slow);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    render(ctx) {
+        if(this.remove) return;
+        if (this.isAreaIndicator) {
+            ctx.save(); ctx.translate(this.x, this.y); ctx.strokeStyle = this.color; ctx.lineWidth = 2; ctx.setLineDash([10, 5]); ctx.globalAlpha = Math.max(0, this.life / 0.5); ctx.beginPath(); ctx.arc(0, 0, this.radius, 0, Math.PI * 2); ctx.stroke(); ctx.fillStyle = this.color; ctx.globalAlpha = Math.max(0, this.life / 0.5) * 0.15; ctx.fill(); ctx.restore(); return;
+        }
+        if (this.isWrathExplosion) {
+            ctx.save(); ctx.translate(this.x, this.y); ctx.beginPath(); ctx.arc(0, 0, this.radius, 0, Math.PI * 2); ctx.fillStyle = `rgba(255, 255, 255, ${this.life / 0.15 * 0.5})`; ctx.fill(); ctx.beginPath(); ctx.arc(0, 0, this.radius * (1 - this.life/0.15), 0, Math.PI * 2); ctx.strokeStyle = `rgba(135, 206, 235, ${this.life / 0.15})`; ctx.lineWidth = 5; ctx.stroke(); ctx.restore(); return;
+        }
+        if(this.behavior === 'linear' || this.behavior === 'typhoon_wave' || this.behavior === 'enemy_bullet') {
+            ctx.fillStyle = this.color; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI*2); ctx.fill();
+        } else if (this.behavior === 'starfall') {
+            ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle + Date.now() * 0.01); ctx.fillStyle = '#87ceeb'; ctx.shadowBlur = 10; ctx.shadowColor = '#fff'; ctx.beginPath(); for (let i = 0; i < 4; i++) { ctx.rotate(Math.PI / 2); ctx.lineTo(this.size, 0); ctx.lineTo(this.size * 0.4, this.size * 0.4); } ctx.closePath(); ctx.fill(); ctx.restore();
+        } else if (this.isMushroom) {
+            ctx.fillStyle = '#4caf50'; ctx.fillRect(this.x-3, this.y, 6, 10); ctx.fillStyle = this.color; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, Math.PI, 0); ctx.fill(); ctx.strokeStyle = 'rgba(50,205,50,0.2)'; ctx.beginPath(); ctx.arc(this.x, this.y, this.range, 0, Math.PI*2); ctx.stroke();
+        } else if (this.behavior === 'follow') {
+            ctx.fillStyle = this.color; ctx.globalAlpha = 0.5; ctx.beginPath(); ctx.arc(this.x, this.y, 10, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha = 1;
+        } else if (this.isBeam) {
+            const beamW = this.beamWidth || 6; const beamH = 800; ctx.save(); ctx.translate(this.x, this.y); ctx.shadowBlur = 30; ctx.shadowColor = this.beamColor || "cyan"; const grad = ctx.createLinearGradient(0, 0, 0, -beamH); grad.addColorStop(0, 'rgba(255, 255, 255, 1)'); grad.addColorStop(0.1, this.beamColor || 'rgba(100, 255, 255, 0.8)'); grad.addColorStop(1, 'rgba(0, 0, 0, 0)'); ctx.fillStyle = grad; ctx.fillRect(-beamW/2, -beamH, beamW, beamH); ctx.beginPath(); ctx.arc(0, 0, 15 + Math.random()*5, 0, Math.PI*2); ctx.fillStyle = this.beamColor || "rgba(200, 255, 255, 0.8)"; ctx.fill(); ctx.restore();
+        } else if (this.isWrathBeam) {
+            const beamW = 40 + 10 * (1 + Math.sin(Date.now() * 0.01) * 0.2); const beamH = 800; ctx.save(); ctx.translate(this.x, this.y); ctx.shadowBlur = 50; ctx.shadowColor = "white"; const grad = ctx.createLinearGradient(0, 0, 0, -beamH); grad.addColorStop(0, 'rgba(200, 255, 255, 0.9)'); grad.addColorStop(0.5, 'rgba(135, 206, 235, 0.6)'); grad.addColorStop(1, 'rgba(255, 255, 255, 0)'); ctx.fillStyle = grad; ctx.fillRect(-beamW/2, -beamH, beamW, beamH); ctx.globalAlpha = 0.6; for(let i=0; i<8; i++) { const pY = -Math.random() * beamH; const pX = (Math.random() - 0.5) * beamW; ctx.fillStyle = '#fff'; ctx.fillRect(pX, pY, 3, 15); } ctx.globalAlpha = 1; ctx.beginPath(); ctx.arc(0, 0, this.radius, 0, Math.PI*2); ctx.strokeStyle = "rgba(255, 255, 255, 0.8)"; ctx.lineWidth = 3; ctx.setLineDash([15, 10]); ctx.rotate(Date.now() * 0.002); ctx.stroke(); ctx.restore();
+        } else if (this.isSunfireExplosion) {
+            ctx.save(); ctx.translate(this.x, this.y); ctx.strokeStyle = '#ffca28'; ctx.lineWidth = 2; ctx.setLineDash([10, 5]); ctx.globalAlpha = Math.max(0, this.life / 0.5); ctx.beginPath(); ctx.arc(0, 0, this.radius, 0, Math.PI * 2); ctx.stroke(); ctx.fillStyle = 'rgba(255, 202, 40, 0.1)'; ctx.fill(); ctx.restore();
+        }
+    }
+}
+
+class Skill {
+    constructor(def) {
+        this.id = def.id; this.def = def; this.name = def.name; this.cd = def.cd; this.timer = 0; this.level = 1; this.maxLevel = def.maxLevel || 5;
+    }
+    update(dt, p, enemies, projs, particles) {
+        if (this.def.passive) {
+            if (CastLogic[this.id]) CastLogic[this.id](this, p, enemies, projs, particles, dt);
+            return;
+        }
+        this.timer -= dt;
+        if(this.timer <= 0 && !this.def.manual) {
+            if(CastLogic[this.id]) {
+                CastLogic[this.id](this, p, enemies, projs, particles);
+                this.timer = this.cd * p.cdr;
+            }
+        }
+    }
+}
+
+const SkillsData = {
+    anger: { name: '愤怒', cd: 1.2, rarity: 'common', desc: '向最近敌人发射能量球' },
+    moonfire: { name: '月火', cd: 2.0, rarity: 'common', desc: '召唤月光灼烧敌人(DOT)' },
+    starfire: { name: '星火', cd: 3.5, rarity: 'common', desc: '范围爆炸伤害，紫色光束' },
+    starsurge: { name: '星涌术', cd: 1.8, rarity: 'rare', desc: '穿透性直线攻击' },
+    mushroom: { name: '向日蘑菇', cd: 4.0, rarity: 'epic', desc: '生成2个蘑菇，结束时绿色爆炸' },
+    barkskin: { name: '树皮术', cd: 0, rarity: 'common', desc: '被动：受到的伤害降低20%', passive: true, maxLevel: 1 },
+    sunfire: { name: '阳炎术', cd: 0, rarity: 'rare', desc: '被动：被月火灼烧的敌人死后爆炸', passive: true, maxLevel: 5 },
+    rejuvenation: { name: '回春术', cd: 0, rarity: 'rare', desc: '被动：微弱恢复生命值', passive: true, maxLevel: 3 },
+    typhoon: { name: '台风', cd: 8.0, rarity: 'rare', desc: '击退前方扇形范围内的敌人', maxLevel: 1 },
+    eluneAspect: { name: '艾露恩之眷', cd: 0, rarity: 'epic', desc: '被动：法术伤害提升，对灼烧目标额外伤害', passive: true, maxLevel: 5 },
+    callWild: { name: '万灵之召', cd: 0, rarity: 'epic', desc: '被动：所有技能冷却时间降低20%', passive: true, maxLevel: 1 },
+    starfall: { name: '星辰坠落', cd: 0.5, rarity: 'epic', desc: '随机降下星辰弹幕轰炸敌人' },
+    wrath: { name: '艾露恩之怒', cd: 60, rarity: 'legendary', desc: '【主动Q】持续光柱追击敌人', manual: true },
+    
+    // 终极技能强化 (Upgrade Skills)
+    silverHorizon: { name: '天涯共银辉', cd: 0, rarity: 'legendary', desc: '艾露恩之怒结束时产生超大爆炸', passive: true, maxLevel: 1, isUltUpgrade: true },
+    radiantMoonlight: { name: '耀世月光', cd: 0, rarity: 'legendary', desc: '艾露恩之怒伤害+50%，冷却-15秒', passive: true, maxLevel: 1, isUltUpgrade: true },
+    lightOfElune: { name: '艾露恩之光', cd: 0, rarity: 'legendary', desc: '月火术有几率触发弱化版艾露恩之怒', passive: true, maxLevel: 1, isUltUpgrade: true }
+};
+
+const CastLogic = {
+    anger: (s, p, enemies, projs) => {
+        const target = getNearest(p, enemies, 500);
+        if(target) { const a = Utils.angle(p.cx, p.cy, target.cx, target.cy); projs.push(new Projectile({ x: p.cx, y: p.cy, angle: a, speed: 350, damage: 15 + (s.level*2), color: '#ffeb3b', size: 6, behavior: 'linear', pierce: false })); }
+    },
+    moonfire: (s, p, enemies, projs) => {
+        const target = getNearest(p, enemies, 600);
+        if(target) {
+            projs.push(new Projectile({ target: target, behavior: 'follow', damage: 5 + s.level, color: '#fff', life: 3, dotInterval: 0.5, sourceId: 'moonfire' }));
+            projs.push(new Projectile({ x: target.cx, y: target.cy, isBeam: true, beamWidth: 4, beamColor: 'rgba(200, 220, 255, 0.8)', color: '#fff', life: 0.35, behavior: 'stationary' }));
+            
+            // 修复：艾露恩之光 (月火联动)
+            if (p.hasMoonfireWrath && p.eluneLightCooldown <= 0 && Math.random() < 0.3) {
+                p.eluneLightCooldown = 10; // 独立冷却 10秒
+                projs.push(new Projectile({ behavior: 'wrath_beam', life: 3, damage: 20, x: target.cx, y: target.cy, radius: 60, isWrathBeam: true }));
+            }
+        }
+    },
+    starfire: (s, p, enemies, projs, particles) => {
+        const target = getRandom(p, enemies, 500);
+        if(target) {
+            const range = 80; enemies.forEach(e => { if(Utils.dist(target.cx, target.cy, e.cx, e.cy) < range) { e.takeDamage(30 + (s.level*5)); particles.spawn(e.cx, e.cy, 5, '#a335ee', 3); } });
+            particles.spawn(target.cx, target.cy, 20, '#ba68c8', 5);
+            projs.push(new Projectile({ x: target.cx, y: target.cy, isBeam: true, beamWidth: 15, beamColor: 'rgba(186, 104, 200, 0.8)', color: '#ba68c8', life: 0.4, behavior: 'stationary' }));
+            projs.push(new Projectile({ x: target.cx, y: target.cy, behavior: 'stationary', life: 0.5, isAreaIndicator: true, radius: 80, color: '#ba68c8' }));
+        }
+    },
+    starsurge: (s, p, enemies, projs) => {
+        const target = getNearest(p, enemies, 700);
+        if(target) { const a = Utils.angle(p.cx, p.cy, target.cx, target.cy); projs.push(new Projectile({ x: p.cx, y: p.cy, angle: a, speed: 450, damage: 25 + (s.level*3), color: '#29b6f6', size: 12, behavior: 'linear', pierce: true, life: 2, isStarsurge: true })); }
+    },
+    mushroom: (s, p, enemies, projs) => {
+        const canvasW = CFG.w; const canvasH = CFG.h; for(let i=0; i<2; i++) { const x = Utils.rand(50, canvasW - 50); const y = Utils.rand(50, canvasH - 50); projs.push(new Projectile({ x: x, y: y, behavior: 'stationary', isMushroom: true, damage: 2, range: 70, slow: 0.3, life: 5, dotInterval: 0.2, color: '#ff9800', size: 10, explosionDamage: 50 + (s.level*10), explosionRadius: 100 })); }
+    },
+    wrath: (s, p, enemies, projs, particles) => {
+        const target = getNearest(p, enemies, 900);
+        const tx = target ? target.cx : p.cx; const ty = target ? target.cy : p.cy;
+        const baseDmg = 50 * p.wrathDamageMult;
+        projs.push(new Projectile({ behavior: 'wrath_beam', life: 10, damage: baseDmg, x: tx, y: ty, radius: 120, isWrathBeam: true, hasExplosion: p.hasWrathExplosion }));
+        return true;
+    },
+    barkskin: (s, p) => { p.damageReduction = 0.2; },
+    sunfire: (s, p) => { p.hasSunfire = true; p.sunfireLevel = s.level; },
+    rejuvenation: (s, p, enemies, projs, particles, dt) => {
+        s.healTimer = (s.healTimer || 0) + dt; if (s.healTimer >= 1.0) { s.healTimer = 0; const healAmount = 1 + s.level; if (p.hp < p.maxHp) { p.hp = Math.min(p.maxHp, p.hp + healAmount); particles.spawn(p.cx, p.cy, 5, '#4caf50', 2); } }
+    },
+    typhoon: (s, p, enemies, projs) => {
+        const target = getNearest(p, enemies, 300); const angle = target ? Utils.angle(p.cx, p.cy, target.cx, target.cy) : (p.facing === 1 ? 0 : Math.PI); const count = 5; const spread = Math.PI / 3; for(let i=0; i<count; i++) { const a = angle - spread/2 + (spread / (count-1)) * i; projs.push(new Projectile({ x: p.cx, y: p.cy, angle: a, speed: 200, damage: 0, color: 'rgba(135, 206, 235, 0.5)', size: 15, behavior: 'typhoon_wave', life: 0.5 })); }
+    },
+    eluneAspect: (s, p) => { p.spellDmg = 1.0 + (s.level * 0.1); p.burnBonus = 0.1 + (s.level * 0.05); },
+    callWild: (s, p) => { p.cdr = 0.8; },
+    starfall: (s, p, enemies, projs) => {
+        const startX = Utils.rand(CFG.w * 0.6, CFG.w + 100); const startY = Utils.rand(-100, 200); const angleDeg = Utils.rand(120, 150); const angle = angleDeg * (Math.PI / 180); projs.push(new Projectile({ x: startX, y: startY, angle: angle, speed: 500, damage: 20 + (s.level * 5), color: '#87ceeb', size: 10, behavior: 'starfall', pierce: false }));
+    },
+    silverHorizon: (s, p) => { p.hasWrathExplosion = true; },
+    radiantMoonlight: (s, p) => { p.wrathDamageMult = 1.5; p.wrathCdReduction = 15; },
+    lightOfElune: (s, p) => { p.hasMoonfireWrath = true; }
+};
+
+class Game {
+    constructor() {
+        this.cvs = document.getElementById('gameCanvas'); this.ctx = this.cvs.getContext('2d');
+        this.ui = { hud: document.getElementById('hud'), hpBar: document.getElementById('hp-bar'), hpText: document.getElementById('hp-text'), expBar: document.getElementById('exp-bar'), expText: document.getElementById('exp-text'), lvl: document.getElementById('level-val'), score: document.getElementById('score-val'), time: document.getElementById('time-val'), skills: document.getElementById('skills-list'), levelup: document.getElementById('levelup-modal'), opts: document.getElementById('levelup-options'), gameover: document.getElementById('gameover-modal'), startMenu: document.getElementById('start-menu'), ultBtn: document.getElementById('ult-btn'), ultMask: document.getElementById('ult-mask'), statsPanel: document.getElementById('stats-panel'), toggleStatsBtn: document.getElementById('toggle-stats-btn'), levelupTitle: document.getElementById('levelup-title') };
+        this.state = 'menu'; this.keys = {}; this.lastTime = 0; this.time = 0; this.p = null; this.enemies = []; this.projs = []; this.parts = new ParticleSystem(); this.spawner = { timer: 0, interval: 1.0 }; this.score = 0; this.diff = 'easy';
+        this.difficultyScaling = { maxEnemiesBase: 80, maxEnemiesCurrent: 80, enemyHpMultiplier: 1.0, enemyDmgMultiplier: 1.0, lastScaleTime: 0 };
+        this.texts = []; // Initialize floating texts array
+        this.initInput(); requestAnimationFrame(t => this.loop(t));
+    }
+    initInput() {
+        window.onkeydown = e => { this.keys[e.code] = true; if(this.state === 'playing') { if(e.code === 'KeyP') this.debug = !this.debug; if(e.code === 'KeyQ') this.castUlt(); } if(this.state === 'levelup') { if(e.code === 'Digit1') this.pickOption(0); if(e.code === 'Digit2') this.pickOption(1); if(e.code === 'Digit3') this.pickOption(2); } };
+        window.onkeyup = e => this.keys[e.code] = false;
+        document.getElementById('start-game-btn').onclick = () => this.start();
+        document.getElementById('test-game-btn').onclick = () => this.startTestMode();
+        document.getElementById('restart-btn').onclick = () => this.reset();
+        this.ui.ultBtn.onclick = () => this.castUlt();
+        this.ui.toggleStatsBtn.onclick = () => { this.ui.statsPanel.classList.toggle('collapsed'); if (this.ui.statsPanel.classList.contains('collapsed')) { this.ui.toggleStatsBtn.innerText = '+'; } else { this.ui.toggleStatsBtn.innerText = '-'; } };
+        
+        // 绑定难度选择按钮
+        ['diff-easy', 'diff-normal', 'diff-hard'].forEach(id => {
+            document.getElementById(id).onclick = (e) => {
+                // 移除所有难度按钮的 active 类
+                ['diff-easy', 'diff-normal', 'diff-hard'].forEach(btnId => {
+                    document.getElementById(btnId).classList.remove('active');
+                });
+                // 给当前点击的按钮添加 active 类
+                e.target.classList.add('active');
+                // 设置临时难度
+                window.tempDiff = id.replace('diff-', '');
+            };
+        });
+    }
+    start() { this.ui.startMenu.classList.add('hidden'); this.ui.hud.classList.remove('hidden'); this.resetGameData(); this.state = 'playing'; }
+    startTestMode() {
+        this.start(); this.time = 150; this.p.lvl = 15; this.p.hp = this.p.maxHp;
+        let req = 20; for(let i=1; i<15; i++) { if(i < 5) req = Math.floor(req * 1.5); else req += 30; } this.p.expReq = req;
+        this.p.skills = []; Object.keys(SkillsData).forEach(key => { const skillDef = SkillsData[key]; if (!skillDef.isUltUpgrade) { const s = new Skill({...skillDef, id: key}); this.p.skills.push(s); if(s.def.passive && CastLogic[key]) CastLogic[key](s, this.p); } });
+        this.difficultyScaling.lastScaleTime = 2; this.difficultyScaling.maxEnemiesCurrent = 80 + 20; this.difficultyScaling.enemyHpMultiplier = 1.0 + 0.4; this.difficultyScaling.enemyDmgMultiplier = 1.0 + 0.2;
+        this.updateSkillUI(); this.updateHUD();
+    }
+    reset() { this.ui.gameover.classList.add('hidden'); this.start(); }
+    resetGameData() {
+        this.p = new Player(CFG.w / 2, CFG.h / 2); this.p.skills.push(new Skill({...SkillsData.anger, id: 'anger'})); this.p.skills.push(new Skill({...SkillsData.moonfire, id: 'moonfire'}));
+        this.enemies = []; this.projs = []; this.score = 0; this.time = 0; this.parts = new ParticleSystem();
+        
+        // 应用选择的难度
+        this.diff = window.tempDiff || 'easy';
+        const settings = DIFFICULTY_SETTINGS[this.diff];
+        this.spawner.interval = settings.spawnRate;
+        
+        this.difficultyScaling = { maxEnemiesBase: settings.maxEnemies, maxEnemiesCurrent: settings.maxEnemies, enemyHpMultiplier: settings.hpMult, enemyDmgMultiplier: settings.dmgMult, lastScaleTime: 0 };
+        this.texts = []; // Reset texts
+        this.updateSkillUI();
+    }
+    loop(t) { const dt = Math.min((t - this.lastTime) / 1000, 0.1); this.lastTime = t; if(this.state === 'playing') { this.update(dt); this.render(); } requestAnimationFrame(t => this.loop(t)); }
+    update(dt) {
+        this.time += dt; this.p.update(dt, this.keys, CFG.w, CFG.h);
+        if (this.time >= 60 && Math.floor(this.time / 60) > this.difficultyScaling.lastScaleTime) { this.difficultyScaling.lastScaleTime = Math.floor(this.time / 60); this.difficultyScaling.maxEnemiesCurrent += 10; this.difficultyScaling.enemyHpMultiplier += 0.2; this.difficultyScaling.enemyDmgMultiplier += 0.1; }
+        this.p.skills.forEach(s => { if(s.id === 'wrath') this.updateUltUI(s); s.update(dt, this.p, this.enemies, this.projs, this.parts); });
+        for(let i=this.projs.length-1; i>=0; i--) { const p = this.projs[i]; p.update(dt, this.enemies, this.parts, this.p, this.projs); if(p.remove) this.projs.splice(i, 1); }
+        this.spawner.timer -= dt; if(this.spawner.timer <= 0) { if (this.enemies.length < this.difficultyScaling.maxEnemiesCurrent) { this.spawnEnemy(); } const nextCd = Math.max(0.1, (this.diff==='easy'?1:0.8) - this.time*0.003); this.spawner.timer = nextCd; }
+        for(let i=this.enemies.length-1; i>=0; i--) { const e = this.enemies[i]; e.update(dt, this.p, this.projs); if(Utils.colRect(this.p, e)) { this.p.takeDamage(e.dmg * dt); if(this.p.hp <= 0) return this.gameover(); } if(e.hp <= 0 || e.dead) { this.p.gainExp(e.expVal); this.score += 10; this.parts.spawn(e.cx, e.cy, 10, e.color); if (this.p.hasSunfire && e.dotEffects.includes('moonfire')) { const dmg = (30 + (this.p.sunfireLevel * 10)) * this.p.spellDmg; const radius = 80; this.enemies.forEach(other => { if (other !== e && !other.dead && Utils.dist(e.cx, e.cy, other.cx, other.cy) < radius) { other.takeDamage(dmg); } }); this.parts.spawn(e.cx, e.cy, 15, '#ffeb3b', 4); this.projs.push(new Projectile({ x: e.cx, y: e.cy, behavior: 'stationary', life: 0.5, isAreaIndicator: true, radius: radius, color: '#ffca28' })); } this.enemies.splice(i, 1); this.checkLevelUp(); } }
+        this.parts.update(dt); 
+        
+        // Update floating texts
+        for(let i=this.texts.length-1; i>=0; i--) {
+            const t = this.texts[i];
+            t.update(dt);
+            if(t.life <= 0) this.texts.splice(i, 1);
+        }
+        
+        this.updateHUD();
+    }
+    render() {
+        const ctx = this.ctx; ctx.fillStyle = CFG.colors.bg; ctx.fillRect(0, 0, CFG.w, CFG.h);
+        if(this.debug) { ctx.strokeStyle = '#333'; ctx.beginPath(); for(let i=0; i<CFG.w; i+=50) { ctx.moveTo(i,0); ctx.lineTo(i,CFG.h); } for(let i=0; i<CFG.h; i+=50) { ctx.moveTo(0,i); ctx.lineTo(CFG.w,i); } ctx.stroke(); }
+        this.parts.render(ctx); this.projs.forEach(p => { if(p.isMushroom) p.render(ctx); });
+        const entities = [...this.enemies, this.p]; entities.sort((a,b) => (a.y+a.h) - (b.y+b.h)); entities.forEach(e => e.render(ctx, this.debug));
+        this.projs.forEach(p => { if(!p.isMushroom) p.render(ctx); });
+        
+        // Render floating texts
+        this.texts.forEach(t => t.render(ctx));
+    }
+    spawnEnemy() {
+        const side = Utils.randInt(0, 4); let x, y; if(side===0) { x=Utils.rand(0, CFG.w); y=-50; } else if(side===1) { x=CFG.w + 50; y=Utils.rand(0, CFG.h); } else if(side===2) { x=Utils.rand(0, CFG.w); y=CFG.h + 50; } else { x=-50; y=Utils.rand(0, CFG.h); }
+        const r = Math.random(); let type = 'basic'; const rangerChance = Math.min(0.3, this.time * 0.005); if (Math.random() < rangerChance) type = 'ranger'; else if(r > 0.8) type = 'tank'; else if(r > 0.6) type = 'fast';
+        this.enemies.push(new Enemy(x, y, type, this.difficultyScaling.enemyHpMultiplier, this.difficultyScaling.enemyDmgMultiplier));
+    }
+    checkLevelUp() { if(this.p.exp >= this.p.expReq) { this.p.exp -= this.p.expReq; this.p.lvl++; if(this.p.lvl <= 5) { this.p.expReq = Math.floor(this.p.expReq * 1.5); } else { this.p.expReq = this.p.expReq + 30; } this.p.hp = this.p.maxHp; this.showLevelUp(); } }
+    showLevelUp() {
+        this.state = 'levelup'; this.ui.levelup.classList.remove('hidden'); this.ui.opts.innerHTML = ''; this.ui.levelupTitle.innerText = "升级！选择奖励";
+        const pool = Object.keys(SkillsData);
+        if(this.p.lvl === 15 && !this.p.skills.find(s=>s.id==='wrath')) { this.createOption(SkillsData.wrath, 'wrath', 0); return; }
+        if ([17, 19, 21].includes(this.p.lvl)) { this.ui.levelupTitle.innerText = "终极强化！(三选一)"; const upgrades = ['silverHorizon', 'radiantMoonlight', 'lightOfElune']; const availableUpgrades = upgrades.filter(id => !this.p.skills.find(s => s.id === id)); availableUpgrades.forEach((id, i) => { this.createOption(SkillsData[id], id, i); }); return; }
+        const opts = []; while(opts.length < 3) { const k = pool[Utils.randInt(0, pool.length)]; const def = SkillsData[k]; if (def.isUltUpgrade) continue; if (k === 'wrath') continue; if(def.rarity === 'rare' && this.p.lvl < 5) continue; if(def.rarity === 'epic' && this.p.lvl < 10) continue; const has = this.p.skills.find(s=>s.id===k); if(has && has.level >= (def.maxLevel || 5)) continue; if(!opts.includes(k)) opts.push(k); }
+        opts.forEach((k, i) => this.createOption(SkillsData[k], k, i));
+    }
+    createOption(def, id, idx) {
+        const has = this.p.skills.find(s=>s.id===id); const isNew = !has; const lvlTxt = isNew ? '新技能' : `Lv.${has.level} -> Lv.${has.level+1}`; const color = CFG.rarityColors[def.rarity];
+        const el = document.createElement('div'); el.className = 'card'; el.style.borderColor = color; el.innerHTML = `<div class="card-key">${idx+1}</div><h3 style="color:${color}">${def.name}</h3><p>${def.desc}</p><div style="font-weight:bold; margin-bottom:5px">${lvlTxt}</div><div class="rarity-tag" style="color:${color}; border:1px solid ${color}">${def.rarity.toUpperCase()}</div>`;
+        el.onclick = () => this.pickOption(idx, id, isNew); this.ui.opts.appendChild(el); this.currentOpts = this.currentOpts || []; this.currentOpts[idx] = {id, isNew};
+    }
+    pickOption(idx) {
+        if(!this.currentOpts || !this.currentOpts[idx]) return; const {id, isNew} = this.currentOpts[idx];
+        if(isNew) { const newSkill = new Skill({...SkillsData[id], id}); this.p.skills.push(newSkill); if (newSkill.def.passive && CastLogic[id]) { CastLogic[id](newSkill, this.p); } } 
+        else { const s = this.p.skills.find(s=>s.id===id); s.level++; if (s.def.passive && CastLogic[id]) { CastLogic[id](s, this.p); } }
+        this.state = 'playing'; this.ui.levelup.classList.add('hidden'); this.updateSkillUI(); this.currentOpts = null;
+    }
+    castUlt() {
+        const s = this.p.skills.find(s=>s.id==='wrath');
+        
+        if (!s) return; // Skill not learned
+        
+        const cd = Math.max(10, s.cd - this.p.wrathCdReduction); // Minimum 10s cooldown
+        
+        if (s.timer > 0) {
+            // Show cooldown warning
+            const remaining = s.timer.toFixed(1);
+            this.showFloatingText(`冷却中: ${remaining}s`, this.p.cx, this.p.cy - 50, '#ff4444');
+            return;
+        }
+
+        if(CastLogic.wrath(s, this.p, this.enemies, this.projs, this.parts)) {
+            s.timer = cd;
+        }
+    }
+    showFloatingText(text, x, y, color='#fff') {
+        this.texts.push(new FloatingText(x, y, text, color));
+    }
+    updateHUD() {
+        const u = this.ui; u.hpBar.style.width = (this.p.hp / this.p.maxHp * 100) + '%'; u.hpText.innerText = `${Math.ceil(this.p.hp)} / ${this.p.maxHp}`;
+        u.expBar.style.width = (this.p.exp / this.p.expReq * 100) + '%'; u.expText.innerText = `${Math.floor(this.p.exp)} / ${this.p.expReq}`;
+        u.lvl.innerText = this.p.lvl; u.score.innerText = this.score; u.time.innerText = Utils.fmtTime(this.time);
+    }
+    updateSkillUI() {
+        this.ui.skills.innerHTML = ''; this.p.skills.forEach(s => { const d = document.createElement('div'); d.className = 'skill-item'; d.style.color = CFG.rarityColors[s.def.rarity]; d.innerText = `${s.name} Lv.${s.level}`; this.ui.skills.appendChild(d); if(s.id === 'wrath') this.ui.ultBtn.style.display = 'flex'; });
+    }
+    updateUltUI(s) {
+        const maxCd = Math.max(10, s.cd - this.p.wrathCdReduction); // Minimum 10s cooldown
+        if(s.timer > 0) { const pct = (s.timer / maxCd) * 100; this.ui.ultMask.style.height = pct + '%'; this.ui.ultBtn.style.borderColor = '#555'; } else { this.ui.ultMask.style.height = '0%'; this.ui.ultBtn.style.borderColor = '#ffcc00'; }
+    }
+    gameover() { this.state = 'gameover'; this.ui.gameover.classList.remove('hidden'); document.getElementById('final-score').innerText = this.score; document.getElementById('final-time').innerText = Utils.fmtTime(this.time); }
+}
+
+// 移除了 window.setDiff 并将其逻辑移入 Game.initInput 中
+// 移除了 window.onload 并将 Game 初始化放在这里
+const g = new Game();
+const _start = g.start.bind(g);
+g.start = () => {
+    // 使用全局变量 tempDiff，如果未设置则默认为 easy
+    g.diff = window.tempDiff || 'easy';
+    _start();
+};
+</script>
+</body>
+</html>
