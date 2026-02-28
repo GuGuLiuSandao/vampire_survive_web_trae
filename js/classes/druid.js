@@ -1,7 +1,7 @@
 // 德鲁伊职业类
 
 import { Player } from '../player.js';
-import { distance, angleBetween } from '../utils.js';
+import { distance, angleBetween, ResourceManager } from '../utils.js';
 
 // 德鲁伊职业类
 class Druid extends Player {
@@ -24,10 +24,10 @@ class Druid extends Player {
         };
         
         // 设置德鲁伊专用图像路径
-        this.images.stand.left.src = './resources/player_druid_stand_left.jpg';
-        this.images.stand.right.src = './resources/player_druid_stand_right.jpg';
-        this.images.walk.left.src = './resources/player_druid_walk_left.jpg';
-        this.images.walk.right.src = './resources/player_druid_walk_right.jpg';
+        this.images.stand.left.src = './resources/player_druid_stand_left.png';
+        this.images.stand.right.src = './resources/player_druid_stand_right.png';
+        this.images.walk.left.src = './resources/player_druid_walk_left.png';
+        this.images.walk.right.src = './resources/player_druid_walk_right.png';
         
         // 初始化当前图像为站立向右
         this.currentImage = this.images.stand.right;

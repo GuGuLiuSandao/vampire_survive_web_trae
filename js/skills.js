@@ -103,7 +103,7 @@ export class Anger extends Skill {
         this.animationFrames = Array.from({ length: 12 }, () => new Image());
         // 加载动画帧（这里假设资源文件有12帧，实际可能需要调整）
         for (let i = 0; i < this.animationFrames.length; i++) {
-            this.animationFrames[i].src = `./resources/skill_anger_frame_${i % 2 + 1}.jpg`; // 目前只有2帧，循环使用
+            this.animationFrames[i].src = `./resources/skill_anger_frame_${i % 2 + 1}.png`; // 目前只有2帧，循环使用
         }
     }
     
@@ -130,12 +130,12 @@ export class Anger extends Skill {
         if (target) {
             console.log(`[${new Date().toISOString()}] 技能目标: 距离 ${closestDistance.toFixed(2)}px 的敌人`);
             
-            // 计算朝向目标的角度
+            // 计算朝向目标的角度，直接加上Math.PI修复方向反向问题
             const playerCenterX = player.x + player.width / 2;
             const playerCenterY = player.y + player.height / 2;
             const enemyCenterX = target.x + target.width / 2;
             const enemyCenterY = target.y + target.height / 2;
-            const angle = angleBetween(playerCenterX, playerCenterY, enemyCenterX, enemyCenterY);
+            const angle = angleBetween(playerCenterX, playerCenterY, enemyCenterX, enemyCenterY) + Math.PI;
             
             // 创建投射物，使用12帧动画
             const projectile = {
@@ -157,6 +157,7 @@ export class Anger extends Skill {
                 frameDirection: 1, // 1表示正向播放，-1表示反向播放
                 frameRate: 0.2, // 帧切换速度
                 frameTimer: 0,
+                rotationOffset: Math.PI, // [修复] 添加旋转偏移量，使图片旋转180度
                 // 添加日志记录属性
                 startTime: Date.now(),
                 hits: 0,
@@ -199,8 +200,8 @@ export class Moonfire extends Skill {
             new Image(),
             new Image()
         ];
-        this.animationFrames[0].src = './resources/skill_moonfire_frame_1.jpg';
-        this.animationFrames[1].src = './resources/skill_moonfire_frame_2.jpg';
+        this.animationFrames[0].src = './resources/skill_moonfire_frame_1.png';
+        this.animationFrames[1].src = './resources/skill_moonfire_frame_2.png';
     }
     
     cast(player, enemies, projectiles) {
@@ -224,53 +225,58 @@ export class Moonfire extends Skill {
         }
         
         if (target) {
-            console.log(`[${new Date().toISOString()}] 技能目标: 距离 ${closestDistance.toFixed(2)}px 的敌人`);
-            
-            // 计算朝向目标的角度
-            const playerCenterX = player.x + player.width / 2;
-            const playerCenterY = player.y + player.height / 2;
-            const enemyCenterX = target.x + target.width / 2;
-            const enemyCenterY = target.y + target.height / 2;
-            
-            // 月火技能：速度无限大，直接击中目标
-            // 对敌人造成直接伤害
-            const enemyHealthBefore = target.health;
-            target.takeDamage(this.damage);
-            
-            console.log(`[${new Date().toISOString()}] 技能${this.name}击中敌人，造成 ${this.damage.toFixed(2)} 直接伤害，敌人剩余生命值: ${target.health.toFixed(2)}`);
-            
-            if (target.health <= 0 && enemyHealthBefore > 0) {
-                console.log(`[${new Date().toISOString()}] 技能${this.name}直接击杀敌人`);
-            } else {
-                // 在敌人身上创建月火效果
-                const moonfireEffect = {
-                    x: enemyCenterX,
-                    y: enemyCenterY,
-                    damage: this.dotDamage,
-                    duration: this.dotDuration,
-                    color: this.color,
-                    type: 'player',
-                    width: 20, // 设置宽度
-                    height: 20, // 设置高度
-                    collisionSize: 10, // 放大碰撞体积
-                    skillId: this.id,
-                    skillName: this.name,
-                    dotDamage: this.dotDamage,
-                    dotDuration: this.dotDuration,
-                    targetEnemy: target,
-                    isEffect: true,
-                    startTime: Date.now(),
-                    animationFrames: this.animationFrames,
-                    currentFrame: 0,
-                    frameDirection: 1,
-                    frameRate: 0.2,
-                    frameTimer: 0,
-                    animationPlayed: false // 只播放一次动画
-                };
+                console.log(`[${new Date().toISOString()}] 技能目标: 距离 ${closestDistance.toFixed(2)}px 的敌人`);
                 
-                projectiles.push(moonfireEffect);
-                console.log(`[${new Date().toISOString()}] 技能${this.name}为敌人添加持续伤害效果，每秒 ${this.dotDamage} 伤害，持续 ${this.dotDuration / 1000} 秒`);
-            }
+                // 计算朝向目标的角度
+                const playerCenterX = player.x + player.width / 2;
+                const playerCenterY = player.y + player.height / 2;
+                const enemyCenterX = target.x + target.width / 2;
+                const enemyCenterY = target.y + target.height / 2;
+                
+                // 月火技能：速度无限大，直接击中目标
+                // 对敌人造成直接伤害
+                const enemyHealthBefore = target.health;
+                target.takeDamage(this.damage);
+                
+                console.log(`[${new Date().toISOString()}] 技能${this.name}击中敌人，造成 ${this.damage.toFixed(2)} 直接伤害，敌人剩余生命值: ${target.health.toFixed(2)}`);
+                
+                // 设置敌人月火灼烧效果
+                if (target.setMoonfireBurn) {
+                    target.setMoonfireBurn(this.dotDuration);
+                }
+                
+                if (target.health <= 0 && enemyHealthBefore > 0) {
+                    console.log(`[${new Date().toISOString()}] 技能${this.name}直接击杀敌人`);
+                } else {
+                    // 在敌人身上创建月火效果
+                    const moonfireEffect = {
+                        x: enemyCenterX,
+                        y: enemyCenterY,
+                        damage: this.dotDamage,
+                        duration: this.dotDuration,
+                        color: this.color,
+                        type: 'player',
+                        width: 20, // 设置宽度
+                        height: 20, // 设置高度
+                        collisionSize: 10, // 放大碰撞体积
+                        skillId: this.id,
+                        skillName: this.name,
+                        dotDamage: this.dotDamage,
+                        dotDuration: this.dotDuration,
+                        targetEnemy: target,
+                        isEffect: true,
+                        startTime: Date.now(),
+                        animationFrames: this.animationFrames,
+                        currentFrame: 0,
+                        frameDirection: 1,
+                        frameRate: 0.2,
+                        frameTimer: 0,
+                        animationPlayed: false // 和星火术一样，只播放一次动画
+                    };
+                    
+                    projectiles.push(moonfireEffect);
+                    console.log(`[${new Date().toISOString()}] 技能${this.name}为敌人添加持续伤害效果，每秒 ${this.dotDamage} 伤害，持续 ${this.dotDuration / 1000} 秒`);
+                }
         } else {
             console.log(`[${new Date().toISOString()}] 技能${this.name}：没有找到目标`);
         }
@@ -308,9 +314,9 @@ export class Starfire extends Skill {
             new Image(),
             new Image()
         ];
-        this.animationFrames[0].src = './resources/skill_starfire_frame_1.jpg';
-        this.animationFrames[1].src = './resources/skill_starfire_frame_2.jpg';
-        this.animationFrames[2].src = './resources/skill_starfire_frame_3.jpg';
+        this.animationFrames[0].src = './resources/skill_starfire_frame_1.png';
+        this.animationFrames[1].src = './resources/skill_starfire_frame_2.png';
+        this.animationFrames[2].src = './resources/skill_starfire_frame_3.png';
     }
     
     cast(player, enemies, projectiles) {
@@ -477,7 +483,7 @@ export class StarSurge extends Skill {
         this.animationFrames = Array.from({ length: 12 }, () => new Image());
         // 加载动画帧（这里假设资源文件有12帧，实际可能需要调整）
         for (let i = 0; i < this.animationFrames.length; i++) {
-            this.animationFrames[i].src = `./resources/skill_starsurge_frame_${i % 2 + 1}.jpg`; // 目前只有2帧，循环使用
+            this.animationFrames[i].src = `./resources/skill_starsurge_frame_${i % 2 + 1}.png`; // 目前只有2帧，循环使用
         }
     }
     
@@ -504,12 +510,12 @@ export class StarSurge extends Skill {
         if (target) {
             console.log(`[${new Date().toISOString()}] 技能目标: 距离 ${closestDistance.toFixed(2)}px 的敌人`);
             
-            // 计算朝向目标的角度
+            // 计算朝向目标的角度，直接加上Math.PI修复方向反向问题
             const playerCenterX = player.x + player.width / 2;
             const playerCenterY = player.y + player.height / 2;
             const enemyCenterX = target.x + target.width / 2;
             const enemyCenterY = target.y + target.height / 2;
-            const angle = angleBetween(playerCenterX, playerCenterY, enemyCenterX, enemyCenterY);
+            const angle = angleBetween(playerCenterX, playerCenterY, enemyCenterX, enemyCenterY) + Math.PI;
             
             // 创建投射物，使用12帧动画
             const projectile = {
@@ -520,19 +526,20 @@ export class StarSurge extends Skill {
                 damage: this.damage,
                 pierce: this.pierce,
                 color: this.color,
-                width: 16, // 放大技能特效尺寸到原来的两倍
-                height: 16,
+                width: 48, // [修复] 加大为原来的2倍
+                height: 48, // [修复] 加大为原来的2倍
                 type: 'player',
-                collisionSize: 8, // 放大碰撞体积
+                collisionSize: 24, // [修复] 加大为原来的2倍
                 skillId: this.id,
                 skillName: this.name,
                 hasExplosion: this.hasExplosion,
-                explosionRadius: 30,
+                explosionRadius: 60, // [修复] 加大为原来的2倍
                 animationFrames: this.animationFrames,
                 currentFrame: 0,
                 frameDirection: 1, // 1表示正向播放，-1表示反向播放
                 frameRate: 0.2, // 帧切换速度
                 frameTimer: 0,
+                rotationOffset: Math.PI, // [修复] 添加旋转偏移量，使图片旋转180度
                 // 添加日志记录属性
                 startTime: Date.now(),
                 hits: 0,
@@ -718,32 +725,37 @@ export class Starfall extends Skill {
     cast(player, enemies, projectiles) {
         console.log(`[${new Date().toISOString()}] 释放技能: ${this.name}`);
         
-        // 从更广阔的上方区域随机角度落下，增加位置随机性
         const canvas = player.canvas || { width: 800, height: 600 };
+        let startX, startY;
         
-        // 生成位置在屏幕右侧更广阔的区域，增加X方向随机性
-        const startX = canvas.width + Math.random() * 200 - 100; // 屏幕右侧外-100px到100px
-        // 生成位置在屏幕上方整个高度范围，增加Y方向随机性
-        const startY = Math.random() * canvas.height * 0.5 - 100; // 屏幕上方-100px到屏幕高度50%
+        // 随机选择落下区域
+        const spawnArea = Math.random();
+        if (spawnArea < 0.5) {
+            // 区域1: 超越竖直线从左到右1/3到最右边开始随机落下
+            // 即X轴范围：canvas.width * 2/3 到 canvas.width + 100
+            startX = canvas.width * 2/3 + Math.random() * (canvas.width/3 + 100);
+            // Y轴范围：屏幕外上方（-50到0）
+            startY = Math.random() * 50 - 50;
+        } else {
+            // 区域2: 从最右边从下到上1/3到最上点开始随机落下
+            // 即X轴范围：canvas.width到canvas.width + 100
+            startX = canvas.width + Math.random() * 100;
+            // Y轴范围：屏幕高度的0到2/3（因为是从下到上1/3到最上点，即从底部的1/3到顶部）
+            startY = Math.random() * (canvas.height * 2/3) - 50;
+        }
         
-        // 随机角度20°到70°（转换为弧度），增加角度随机性
-        const minAngle = Math.PI / 9; // 20°
-        const maxAngle = Math.PI / 2.57; // 70°
+        // 落下方向为右上到坐下，角度在30°~60°之间随机
+        // 30° = Math.PI / 6, 60° = Math.PI / 3
+        const minAngle = Math.PI / 6; // 30°
+        const maxAngle = Math.PI / 3; // 60°
         const angle = minAngle + Math.random() * (maxAngle - minAngle);
-        
-        // 计算目标位置
-        const distance = Math.max(canvas.width, canvas.height) * 1.5; // 增加距离，扩大覆盖范围
-        const targetX = startX - Math.cos(angle) * distance;
-        const targetY = startY + Math.sin(angle) * distance;
         
         console.log(`[${new Date().toISOString()}] 技能${this.name}从位置 (${startX.toFixed(0)}, ${startY.toFixed(0)}) 以 ${(angle * 180 / Math.PI).toFixed(0)}° 角度落下`);
         
-        // 创建陨石投射物（下落动画阶段，无伤害）
+        // 创建陨石投射物（下落过程中就能造成伤害，不能穿透）
         projectiles.push({
             x: startX,
             y: startY,
-            targetX: targetX,
-            targetY: targetY,
             angle: angle,
             speed: 300, // 下落速度
             color: '#a335ee',
@@ -754,12 +766,14 @@ export class Starfall extends Skill {
             skillId: this.id,
             isMeteor: true,
             hasLanded: false,
-            damage: 0, // 下落过程无伤害
-            explosionRadius: this.radius,
+            damage: this.damage, // 下落过程中就能造成伤害
+            pierce: 1, // 不能穿透，只能击中一个敌人
+            explosionRadius: 0, // 不再需要爆炸范围
             skillName: this.name,
-            duration: 2000, // 下落动画持续时间
-            finalDamage: this.damage, // 落地时的最终伤害
-            finalRadius: this.radius // 落地时的伤害范围
+            duration: 3000, // 持续时间，超过则消失
+            finalDamage: 0, // 不再需要最终伤害
+            finalRadius: 0, // 不再需要最终范围
+            canvas: canvas // 保存canvas引用，用于边界检查
         });
     }
     

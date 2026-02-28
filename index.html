@@ -8,7 +8,7 @@
 </head>
 <body>
     <div class="game-container">
-        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <canvas id="gameCanvas" width="1000" height="600"></canvas>
         <div id="ui-container">
             <!-- 顶部横条 - 血量和经验 -->
             <div class="top-bar">
@@ -24,11 +24,14 @@
             
             <!-- 底部左侧信息面板 -->
             <div class="bottom-left-panel">
-                <div class="level-info">等级: <span id="level-value">1</span></div>
-                <div class="score-info">得分: <span id="score-value">0</span></div>
-                <div class="fps-info">FPS: <span id="fps-value">0</span></div>
-                <div class="skills-panel">
-                    <!-- 技能等级信息将通过JavaScript动态添加 -->
+                <button class="toggle-btn" title="收起/展开面板">◀</button>
+                <div class="panel-content">
+                    <div class="level-info">等级: <span id="level-value">1</span></div>
+                    <div class="score-info">得分: <span id="score-value">0</span></div>
+                    <div class="fps-info">FPS: <span id="fps-value">0</span></div>
+                    <div class="skills-panel">
+                        <!-- 技能等级信息将通过JavaScript动态添加 -->
+                    </div>
                 </div>
             </div>
             

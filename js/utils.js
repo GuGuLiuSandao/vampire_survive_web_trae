@@ -1,12 +1,41 @@
 // 工具函数模块
 
 /**
+ * 资源管理器 - 解决重复创建 Image 导致的卡顿问题
+ */
+export const ResourceManager = {
+    cache: {},
+    
+    getImage(src) {
+        if (!this.cache[src]) {
+            const img = new Image();
+            img.src = src;
+            this.cache[src] = img;
+        }
+        return this.cache[src];
+    },
+
+    // 预加载关键图片
+    preload() {
+        const paths = [
+            'resources/enemy_evil_dog_left.png', 'resources/enemy_evil_dog_stand_right.png',
+            'resources/enemy_evil_dog_walk_left.png', 'resources/enemy_evil_dog_walk_right.png',
+            'resources/enemy_tank_interno_stand_left.png', 'resources/enemy_tank_interno_stand_right.png',
+            'resources/enemy_tank_interno_walk_left.png', 'resources/enemy_tank_interno_walk_right.png',
+            'resources/player_druid_stand_left.png', 'resources/player_druid_stand_right.png',
+            'resources/player_druid_walk_left.png', 'resources/player_druid_walk_right.png',
+            'resources/skill_anger_frame_1.png', 'resources/skill_anger_frame_2.png',
+            'resources/skill_moonfire_frame_1.png', 'resources/skill_moonfire_frame_2.png',
+            'resources/skill_starfire_frame_1.png', 'resources/skill_starfire_frame_2.png',
+            'resources/skill_starfire_frame_3.png',
+            'resources/skill_starsurge_frame_1.png', 'resources/skill_starsurge_frame_2.png'
+        ];
+        paths.forEach(p => this.getImage(p));
+    }
+};
+
+/**
  * 计算两点之间的距离
- * @param {number} x1 - 第一个点的x坐标
- * @param {number} y1 - 第一个点的y坐标
- * @param {number} x2 - 第二个点的x坐标
- * @param {number} y2 - 第二个点的y坐标
- * @returns {number} 两点之间的距离
  */
 export function distance(x1, y1, x2, y2) {
     const dx = x2 - x1;
@@ -16,34 +45,34 @@ export function distance(x1, y1, x2, y2) {
 
 /**
  * 计算两点之间的角度（弧度）
- * @param {number} x1 - 第一个点的x坐标
- * @param {number} y1 - 第一个点的y坐标
- * @param {number} x2 - 第二个点的x坐标
- * @param {number} y2 - 第二个点的y坐标
- * @returns {number} 两点之间的角度（弧度）
  */
 export function angleBetween(x1, y1, x2, y2) {
     return Math.atan2(y2 - y1, x2 - x1);
 }
 
 /**
- * 检查两个矩形是否碰撞（AABB碰撞检测）
- * @param {Object} rect1 - 第一个矩形 {x, y, width, height}
- * @param {Object} rect2 - 第二个矩形 {x, y, width, height}
- * @returns {boolean} 是否碰撞
+ * 检查两个矩形是否碰撞（优化版：基于中心点和collisionSize）
  */
 export function checkCollision(rect1, rect2) {
-    return rect1.x < rect2.x + rect2.width &&
-           rect1.x + rect1.width > rect2.x &&
-           rect1.y < rect2.y + rect2.height &&
-           rect1.y + rect1.height > rect2.y;
+    // 计算中心点
+    const r1cx = rect1.x + rect1.width / 2;
+    const r1cy = rect1.y + rect1.height / 2;
+    const r2cx = rect2.x + rect2.width / 2;
+    const r2cy = rect2.y + rect2.height / 2;
+
+    // 获取碰撞体积大小（如果没有定义 collisionSize 则使用 width/2 作为半径）
+    const r1w = (rect1.collisionSize || rect1.width) / 2; // 转换为半径
+    const r1h = (rect1.collisionSize || rect1.height) / 2; // 转换为半径
+    const r2w = (rect2.collisionSize || rect2.width) / 2; // 转换为半径
+    const r2h = (rect2.collisionSize || rect2.height) / 2; // 转换为半径
+
+    // AABB 碰撞检测 - 正确的逻辑：中心点距离 < 半径之和
+    return Math.abs(r1cx - r2cx) < (r1w + r2w) &&
+           Math.abs(r1cy - r2cy) < (r1h + r2h);
 }
 
 /**
  * 随机生成指定范围内的整数
- * @param {number} min - 最小值（包含）
- * @param {number} max - 最大值（不包含）
- * @returns {number} 随机整数
  */
 export function randomInt(min, max) {
     return Math.floor(Math.random() * (max - min)) + min;
@@ -51,9 +80,6 @@ export function randomInt(min, max) {
 
 /**
  * 随机生成指定范围内的浮点数
- * @param {number} min - 最小值
- * @param {number} max - 最大值
- * @returns {number} 随机浮点数
  */
 export function randomFloat(min, max) {
     return Math.random() * (max - min) + min;
@@ -61,10 +87,6 @@ export function randomFloat(min, max) {
 
 /**
  * 限制数值在指定范围内
- * @param {number} value - 要限制的值
- * @param {number} min - 最小值
- * @param {number} max - 最大值
- * @returns {number} 限制后的值
  */
 export function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
@@ -72,10 +94,6 @@ export function clamp(value, min, max) {
 
 /**
  * 线性插值
- * @param {number} a - 起始值
- * @param {number} b - 结束值
- * @param {number} t - 插值因子（0-1）
- * @returns {number} 插值结果
  */
 export function lerp(a, b, t) {
     return a + (b - a) * t;
@@ -83,8 +101,6 @@ export function lerp(a, b, t) {
 
 /**
  * 将角度转换为弧度
- * @param {number} degrees - 角度
- * @returns {number} 弧度
  */
 export function degreesToRadians(degrees) {
     return degrees * Math.PI / 180;
@@ -92,8 +108,6 @@ export function degreesToRadians(degrees) {
 
 /**
  * 将弧度转换为角度
- * @param {number} radians - 弧度
- * @returns {number} 角度
  */
 export function radiansToDegrees(radians) {
     return radians * 180 / Math.PI;
@@ -101,7 +115,6 @@ export function radiansToDegrees(radians) {
 
 /**
  * 获取随机颜色
- * @returns {string} 十六进制颜色代码
  */
 export function getRandomColor() {
     const letters = '0123456789ABCDEF';
@@ -114,8 +127,6 @@ export function getRandomColor() {
 
 /**
  * 格式化时间（秒）为 MM:SS 格式
- * @param {number} seconds - 秒数
- * @returns {string} 格式化后的时间字符串
  */
 export function formatTime(seconds) {
     const mins = Math.floor(seconds / 60);
@@ -125,8 +136,6 @@ export function formatTime(seconds) {
 
 /**
  * 深拷贝对象
- * @param {Object} obj - 要拷贝的对象
- * @returns {Object} 拷贝后的对象
  */
 export function deepCopy(obj) {
     if (obj === null || typeof obj !== 'object') {
@@ -151,9 +160,6 @@ export function deepCopy(obj) {
 
 /**
  * 防抖函数
- * @param {Function} func - 要防抖的函数
- * @param {number} delay - 延迟时间（毫秒）
- * @returns {Function} 防抖后的函数
  */
 export function debounce(func, delay) {
     let timeoutId;
@@ -165,9 +171,6 @@ export function debounce(func, delay) {
 
 /**
  * 节流函数
- * @param {Function} func - 要节流的函数
- * @param {number} limit - 时间限制（毫秒）
- * @returns {Function} 节流后的函数
  */
 export function throttle(func, limit) {
     let inThrottle;

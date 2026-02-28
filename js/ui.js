@@ -4,7 +4,6 @@ import { formatTime } from './utils.js';
 
 class UI {
     constructor() {
-        // 获取DOM元素
         this.healthValue = document.getElementById('health-value');
         this.healthFill = document.getElementById('health-fill');
         this.expValue = document.getElementById('exp-value');
@@ -14,110 +13,85 @@ class UI {
         this.scoreValue = document.getElementById('score-value');
         this.fpsValue = document.getElementById('fps-value');
         
-        // 技能面板元素
         this.skillsPanel = document.querySelector('.skills-panel');
         
-        // 面板元素
         this.levelUpPanel = document.getElementById('level-up-panel');
         this.gameOverPanel = document.getElementById('game-over-panel');
         this.finalScore = document.getElementById('final-score');
         this.survivalTime = document.getElementById('survival-time');
         
-        // 艾露恩之怒技能按钮和倒计时元素
         this.legendarySkillBtn = document.getElementById('legendary-skill-btn');
         this.skillCooldown = document.getElementById('skill-cooldown');
         this.skillCooldownOverlay = document.getElementById('skill-cooldown-overlay');
+        
+        // 底部面板收起/展开功能
+        this.bottomLeftPanel = document.querySelector('.bottom-left-panel');
+        this.toggleBtn = document.querySelector('.toggle-btn');
+        this.setupPanelToggle();
+    }
+    
+    setupPanelToggle() {
+        if (this.toggleBtn) {
+            // 确保DOM完全加载后再添加事件监听器
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => {
+                    this.toggleBtn.addEventListener('click', () => {
+                        this.bottomLeftPanel.classList.toggle('collapsed');
+                    });
+                });
+            } else {
+                this.toggleBtn.addEventListener('click', () => {
+                    this.bottomLeftPanel.classList.toggle('collapsed');
+                });
+            }
+        }
     }
     
     update(gameState) {
-        // 更新生命值显示
-        this.updateHealthBar(gameState.health, gameState.maxHealth);
+        // 基础信息
+        this.healthValue.textContent = Math.ceil(gameState.health);
+        this.healthFill.style.width = `${(gameState.health / gameState.maxHealth) * 100}%`;
         
-        // 更新经验值显示
-        this.updateExpBar(gameState.exp, gameState.expRequired);
+        this.expValue.textContent = Math.floor(gameState.exp);
+        this.expRequired.textContent = gameState.expRequired;
+        this.expFill.style.width = `${(gameState.exp / gameState.expRequired) * 100}%`;
         
-        // 更新等级显示
         this.levelValue.textContent = gameState.level;
-        
-        // 更新得分显示
         this.scoreValue.textContent = gameState.score;
-        
-        // 更新FPS显示
         this.fpsValue.textContent = gameState.fps;
         
-        // 更新技能等级显示
-        if (gameState.skills) {
-            this.updateSkillsPanel(gameState.skills);
-        }
+        // 技能列表
+        this.updateSkillsPanel(gameState.skills);
         
-        // 更新艾露恩之怒技能按钮和倒计时显示
+        // 大招显示逻辑
         if (gameState.skills) {
             const elunesWrathSkill = gameState.skills.find(skill => skill.id === 'elunesWrath');
             if (elunesWrathSkill) {
-                // 显示技能按钮
                 this.legendarySkillBtn.classList.remove('hidden');
                 
-                // 更新倒计时显示
-                const cooldownSeconds = elunesWrathSkill.getCurrentCooldownSeconds();
-                this.skillCooldown.textContent = cooldownSeconds > 0 ? `${cooldownSeconds}s` : '就绪';
+                // [适配] 直接读取 currentCooldown (毫秒)
+                const cooldownSeconds = Math.ceil(elunesWrathSkill.currentCooldown / 1000);
+                this.skillCooldown.textContent = cooldownSeconds > 0 ? `${cooldownSeconds}s` : 'Q';
                 
-                // 更新冷却覆盖层
-                const cooldownPercentage = elunesWrathSkill.getCooldownPercentage();
-                this.skillCooldownOverlay.style.height = `${cooldownPercentage * 100}%`;
+                const pct = elunesWrathSkill.getCooldownPct ? elunesWrathSkill.getCooldownPct() : 0;
+                this.skillCooldownOverlay.style.height = `${pct * 100}%`;
             } else {
-                // 隐藏技能按钮
                 this.legendarySkillBtn.classList.add('hidden');
             }
-        } else {
-            // 隐藏技能按钮
-            this.legendarySkillBtn.classList.add('hidden');
         }
     }
     
-    // 更新技能面板显示
     updateSkillsPanel(skills) {
         if (!this.skillsPanel) return;
-        
-        // 清空现有技能信息
         this.skillsPanel.innerHTML = '';
         
-        // 只显示已学习的技能
-        const learnedSkills = skills.filter(skill => skill !== null && skill !== undefined);
-        
-        if (learnedSkills.length === 0) {
-            const noSkillsElement = document.createElement('div');
-            noSkillsElement.className = 'skill-level-item';
-            noSkillsElement.textContent = '暂无学习的技能';
-            this.skillsPanel.appendChild(noSkillsElement);
-            return;
-        }
-        
-        // 添加技能等级信息
-        learnedSkills.forEach(skill => {
+        skills.forEach(skill => {
             const skillElement = document.createElement('div');
             skillElement.className = 'skill-level-item';
-            skillElement.textContent = `${skill.name}: 等级 ${skill.level}`;
+            skillElement.textContent = `${skill.name}: Lv.${skill.level}`;
+            skillElement.style.color = skill.getRarityColor();
             this.skillsPanel.appendChild(skillElement);
         });
-    }
-    
-    updateHealthBar(current, max) {
-        // 更新生命值文本
-        this.healthValue.textContent = Math.floor(current);
-        
-        // 更新生命值条宽度
-        const healthPercent = current / max;
-        this.healthFill.style.width = `${healthPercent * 100}%`;
-    }
-    
-    updateExpBar(current, required) {
-        // 更新经验值文本
-        this.expValue.textContent = Math.floor(current);
-        this.expRequired.textContent = required;
-        
-        // 更新经验值条宽度
-        const expPercent = current / required;
-        this.expFill.style.width = `${expPercent * 100}%`;
     }
     
     showLevelUpPanel() {
@@ -129,61 +103,13 @@ class UI {
     }
     
     showGameOverPanel(gameStats) {
-        // 更新最终得分
         this.finalScore.textContent = gameStats.score;
-        
-        // 更新生存时间
         this.survivalTime.textContent = formatTime(gameStats.survivalTime);
-        
-        // 显示游戏结束面板
         this.gameOverPanel.classList.remove('hidden');
     }
     
     hideGameOverPanel() {
         this.gameOverPanel.classList.add('hidden');
-    }
-    
-    // 显示暂停菜单
-    showPauseMenu() {
-        // 实现暂停菜单显示逻辑
-    }
-    
-    // 隐藏暂停菜单
-    hidePauseMenu() {
-        // 实现暂停菜单隐藏逻辑
-    }
-    
-    // 显示主菜单
-    showMainMenu() {
-        // 实现主菜单显示逻辑
-    }
-    
-    // 隐藏主菜单
-    hideMainMenu() {
-        // 实现主菜单隐藏逻辑
-    }
-    
-    // 更新技能选择选项
-    updateLevelUpOptions(options) {
-        // 获取选项容器
-        const optionsContainer = document.querySelector('.level-up-options');
-        
-        // 清空现有选项
-        optionsContainer.innerHTML = '';
-        
-        // 添加新选项
-        options.forEach((option, index) => {
-            const optionElement = document.createElement('div');
-            optionElement.className = 'option';
-            optionElement.dataset.option = index;
-            
-            optionElement.innerHTML = `
-                <h3>${option.name}</h3>
-                <p>${option.description}</p>
-            `;
-            
-            optionsContainer.appendChild(optionElement);
-        });
     }
 }
 
